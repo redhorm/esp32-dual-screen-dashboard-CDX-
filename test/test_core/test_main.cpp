@@ -16,6 +16,14 @@
 #include "core/noise.h"
 #include "core/compass.h"
 #include "core/ui_settings.h"
+#include "core/rock_line_game.h"
+#include "core/social_beta.h"
+#include <type_traits>
+
+static_assert(std::is_trivially_copyable<RockGameSnapshot>::value,
+              "game snapshot must remain safe for SharedFrame copies");
+static_assert(std::is_trivially_copyable<BetaFrame>::value,
+              "beta frame must remain safe for SharedFrame copies");
 
 void setUp() {}
 void tearDown() {}
@@ -767,6 +775,102 @@ static void test_ui_numeric_clamps() {
     TEST_ASSERT_EQUAL_UINT16(3500, clampU16(9000, 500, 3500));
 }
 
+// ── Social beta / Rock Line Rush ─────────────────────────────────────
+
+static void enterGamePlay(RockLineGame& game, uint32_t& now) {
+    game.start(0);
+    now = 2200;
+    game.update(now);
+    TEST_ASSERT_EQUAL_INT((int)RockGameStatus::PLAYING,
+                          (int)game.snapshot(now).status);
+}
+
+static void moveGameTo(RockLineGame& game, int target, uint32_t& now) {
+    for (int i = 0; i < 60; i++) {
+        int x = game.snapshot(now).line_x;
+        if (x >= target - 3 && x <= target + 3) break;
+        game.control(x < target ? 100 : -100, false, now);
+        now += 50;
+        game.update(now);
+    }
+    game.control(0, true, now);
+}
+
+static void driveToNextGate(RockLineGame& game, uint32_t& now) {
+    uint8_t gate = game.snapshot(now).gate;
+    for (int i = 0; i < 160 && game.snapshot(now).gate == gate; i++) {
+        game.control(0, true, now);
+        now += 50;
+        game.update(now);
+    }
+}
+
+static void test_rock_game_countdown_and_safe_line() {
+    RockLineGame game;
+    game.start(100);
+    TEST_ASSERT_EQUAL_INT((int)RockGameStatus::COUNTDOWN,
+                          (int)game.snapshot(100).status);
+    game.update(2299);
+    TEST_ASSERT_EQUAL_INT((int)RockGameStatus::COUNTDOWN,
+                          (int)game.snapshot(2299).status);
+    game.update(2300);
+    TEST_ASSERT_EQUAL_INT((int)RockGameStatus::PLAYING,
+                          (int)game.snapshot(2300).status);
+    for (int i = 0; i < 12; i++) {
+        int x = RockLineGame::safeLine(i);
+        TEST_ASSERT_TRUE(x >= -65 && x <= 65);
+        TEST_ASSERT_EQUAL_INT(x, RockLineGame::safeLine(i));
+    }
+}
+
+static void test_rock_game_clean_gate_scores_combo() {
+    RockLineGame game; uint32_t now;
+    enterGamePlay(game, now);
+    moveGameTo(game, RockLineGame::safeLine(0), now);
+    driveToNextGate(game, now);
+    RockGameSnapshot s = game.snapshot(now);
+    TEST_ASSERT_EQUAL_UINT8(1, s.gate);
+    TEST_ASSERT_EQUAL_UINT8(3, s.lives);
+    TEST_ASSERT_EQUAL_UINT8(1, s.combo);
+    TEST_ASSERT_TRUE(s.score >= 100);
+    TEST_ASSERT_TRUE(s.last_result == GateResult::PERFECT ||
+                     s.last_result == GateResult::CLEAN);
+}
+
+static void test_rock_game_hit_costs_life() {
+    RockLineGame game; uint32_t now;
+    enterGamePlay(game, now);
+    int safe = RockLineGame::safeLine(0);
+    moveGameTo(game, safe >= 0 ? -90 : 90, now);
+    driveToNextGate(game, now);
+    RockGameSnapshot s = game.snapshot(now);
+    TEST_ASSERT_EQUAL_UINT8(1, s.gate);
+    TEST_ASSERT_EQUAL_UINT8(2, s.lives);
+    TEST_ASSERT_EQUAL_UINT8(0, s.combo);
+    TEST_ASSERT_EQUAL_INT((int)GateResult::HIT, (int)s.last_result);
+}
+
+static void test_social_beta_unlocks_and_mode_priority() {
+    SocialBetaEngine beta; beta.reset(0);
+    VehicleState s; s.speed_mph = 60; s.rpm = REDLINE_RPM;
+    s.four_wd_lock = true;
+    UiFx fx; fx.phase = Phase::LIVE; fx.now_ms = 1000;
+    beta.update(1000, s, fx);
+    BetaFrame f = beta.frame(1000);
+    TEST_ASSERT_TRUE(f.badge_mask & (1UL << (int)TrailBadge::SEND_IT));
+    TEST_ASSERT_TRUE(f.badge_mask & (1UL << (int)TrailBadge::REDLINE));
+    TEST_ASSERT_TRUE(f.badge_mask & (1UL << (int)TrailBadge::FOUR_BY_FOUR));
+
+    beta.startShow(ShowProgram::NIGHT_RAID, 1100);
+    TEST_ASSERT_EQUAL_INT((int)BetaMode::SHOW, (int)beta.frame(1200).mode);
+    beta.triggerHype(HypeReaction::STOP, nullptr, 1200);
+    TEST_ASSERT_EQUAL_INT((int)BetaMode::HYPE, (int)beta.frame(1300).mode);
+    beta.startGame(1400);
+    TEST_ASSERT_EQUAL_INT((int)BetaMode::GAME, (int)beta.frame(1400).mode);
+    beta.stopGame();
+    TEST_ASSERT_EQUAL_INT((int)BetaMode::NORMAL, (int)beta.frame(1500).mode);
+}
+
 // ── Runner ───────────────────────────────────────────────────────────────────
 
 int main(int, char**) {
@@ -837,6 +941,10 @@ int main(int, char**) {
     RUN_TEST(test_fmt_race_time);
     RUN_TEST(test_ui_theme_sanitization);
     RUN_TEST(test_ui_numeric_clamps);
+    RUN_TEST(test_rock_game_countdown_and_safe_line);
+    RUN_TEST(test_rock_game_clean_gate_scores_combo);
+    RUN_TEST(test_rock_game_hit_costs_life);
+    RUN_TEST(test_social_beta_unlocks_and_mode_priority);
 
     return UNITY_END();
 }

@@ -513,6 +513,7 @@ void SceneNavigator::render(const VehicleState& s, const UiFx& fx,
     } else if (fx.phase != Phase::BOOT) {
         _bootPhotoLoaded = false;
     }
+    if (_renderBetaTakeover(fx)) return;
     if (_settings.photo_mode_enabled && (_settings.photo_target & 0x02) &&
         photoStore.drawFrame(_spr, true, _photoFrame, _settings, fx.now_ms))
         return;
@@ -523,6 +524,7 @@ void SceneNavigator::render(const VehicleState& s, const UiFx& fx,
             case Phase::LIVE:   _renderThemedLive(s, fx);       break;
             case Phase::FINISH: _renderThemedFinish(fx, stats); break;
         }
+        _drawBetaBadge();
         return;
     }
 
@@ -532,6 +534,7 @@ void SceneNavigator::render(const VehicleState& s, const UiFx& fx,
         case Phase::FINISH: _renderFinish(fx, stats);   break;
         case Phase::LIVE:   _renderLive(s, fx);         break;
     }
+    _drawBetaBadge();
 }
 
 #endif // NATIVE_BUILD

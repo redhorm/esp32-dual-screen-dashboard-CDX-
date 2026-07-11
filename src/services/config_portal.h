@@ -5,10 +5,11 @@
 #include <Preferences.h>
 #include <WebServer.h>
 #include "core/ui_settings.h"
+#include "core/social_beta.h"
 
 class ConfigPortal {
 public:
-    ConfigPortal();
+    explicit ConfigPortal(SocialBetaEngine& beta);
     bool begin();
     void handle();
     const UiSettings& settings() const { return _settings; }
@@ -19,6 +20,7 @@ private:
     WebServer   _server;
     Preferences _prefs;
     UiSettings  _settings;
+    SocialBetaEngine& _beta;
     char        _ip[16] = "0.0.0.0";
     bool        _upload_ok = false;
 
@@ -32,6 +34,15 @@ private:
     void _deleteBoot();
     void _handleUpload(bool boot, bool navigator);
     void _finishUpload();
+    void _sendCapabilities();
+    void _sendBetaState();
+    void _sendProfile();
+    void _saveProfile();
+    void _setMoment();
+    void _setCallout();
+    void _startGame();
+    void _inputGame();
+    void _gameAction();
 };
 
 #endif

@@ -1,5 +1,9 @@
 # ESP32-S3 Dual Display — RC Ultra4 Dashboard + Waypoint Navigator
 
+> **Social Beta `2.0.0-beta.1` — SEND//SYNC**
+> La versione AP/temi/foto precedente è conservata nel branch
+> `codex/ap-dashboard-themes`; questa beta vive in `codex/social-beta`.
+
 Due display SPI indipendenti pilotati in parallelo (DMA su due host SPI separati):
 
 | Display | Pannello | Risoluzione | Ruolo | Host SPI | Target FPS |
@@ -110,6 +114,73 @@ Le immagini ottimizzate vivono nella partizione LittleFS da circa 4,9 MB. La
 dissolvenza usa un dithering progressivo senza allocare un secondo framebuffer
 240×240, preservando RAM e DMA dei display.
 
+## Social Beta — cinque funzioni
+
+### 1. Dual Live Mirror
+
+Il portale ricostruisce in Canvas i due cockpit e mostra speed, RPM, gear e
+modalità a 4 Hz. Non viene trasmesso un framebuffer: il browser disegna dai
+pochi valori JSON, mantenendo basso il carico Wi-Fi.
+
+### 2. Moment Director
+
+Cinque takeover coordinati usano lo stesso timestamp sui due display e sul
+telefono: **Mud Splash**, **Water Ford**, **Night Raid**, **Winch Pull** e
+**Send It**. Sono animazioni a primitive, senza immagini o nuove allocazioni.
+
+### 3. Spotter Squad
+
+Il copilota può inviare LEFT, RIGHT, STOP, WATER, LINE CLEAR, WINCH e CHAMPION.
+I cue prendono temporaneamente il controllo di entrambi gli schermi; STOP usa
+rosso e contrasto massimo. Il telefono vibra quando la funzione è supportata.
+
+### 4. Trail Badges
+
+Il firmware sblocca automaticamente cinque achievement durante la run:
+SEND IT 55, REDLINE KING, 4X4 HERO, CLEAN LINE e STAGE CRUSHER. Lo sblocco è
+sincronizzato sui display e diventa un elemento del poster social.
+
+### 5. Reel Forge
+
+Reel Forge compone sul telefono un poster JPEG 1080×1920 con foto del mezzo,
+team, callsign, numero, handle, telemetria e badge. La foto resta locale al
+browser. Web Share viene usato quando disponibile; sugli altri dispositivi c'è
+il salvataggio JPEG. Per pubblicare online bisogna riconnettere il telefono a
+Internet dopo aver creato il poster sulla rete AP.
+
+### Digital Garage
+
+Callsign, team, handle, numero e colore accent sono salvati in NVS e riutilizzati
+da Moment Director, display, gioco e Reel Forge. I testi sono filtrati al set di
+caratteri realmente disponibile nei font embedded.
+
+## Mini-gioco: Rock Line Rush
+
+Rock Line Rush è server-authoritative: il telefono invia solo sterzo e throttle,
+mentre l'ESP32 calcola fisica, linea sicura, gate, collisioni, vite, combo e
+punteggio. Lo stesso `RockGameSnapshot` POD viene copiato nello `SharedFrame`:
+
+- dashboard 160×80: trail top-down, score, vite, combo, velocità e progresso;
+- navigatore 240×240: trail prospettico, gate/massi e Jeep animata;
+- web UI: Canvas 480×360, touch LEFT/THROTTLE/RIGHT e tastiera WASD;
+- 12 gate, 3 vite, perfect/clean/hit e record persistente;
+- watchdog a 650 ms: se il telefono sparisce, sterzo e gas tornano neutri.
+
+Il gioco riusa i framebuffer esistenti e non alloca sprite aggiuntivi.
+
+### API beta
+
+| Metodo | Endpoint | Funzione |
+|---|---|---|
+| GET | `/api/v2/capabilities` | versione e feature supportate |
+| GET | `/api/v2/state` | snapshot live completo |
+| GET/POST | `/api/v2/profile` | Digital Garage |
+| POST | `/api/v2/moment` | avvia/ferma Moment Director |
+| POST | `/api/v2/callout` | cue Spotter Squad |
+| POST | `/api/v2/game/start` | nuova partita |
+| POST | `/api/v2/game/input` | sterzo e throttle |
+| POST | `/api/v2/game/action` | quit/restart |
+
 ## Pinout (ESP32-S3 DevKitC-1)
 
 Tutto il pinout e il tuning vivono in **`include/config.h`** — unico punto di modifica.
@@ -189,6 +260,8 @@ src/
     noise.h             ← value noise deterministico (jitter, vibrazione)
     compass.h           ← geometria nastro bussola tape-style
     formatter.{h,cpp}   ← formattazione valori in buffer (no heap)
+    rock_line_game.*    ← motore deterministico del mini-gioco
+    social_beta.*       ← mode director, spotter, badge e identità
   hal/
     display_a.h         ← LGFX device ST7735S su SPI2_HOST + DMA
     display_b.h         ← LGFX device ST7789  su SPI3_HOST + DMA
@@ -196,6 +269,7 @@ src/
     scene_dashboard.*   ← render 160×80 (sprite full-frame)
     scene_navigator.*   ← render 240×240 (sprite full-frame)
     scene_*_themes.cpp  ← Baja Amber, Night Ops, Trail Topo
+    scene_social_beta.cpp ← momenti, cue, badge e Rock Line Rush
   services/
     config_portal.*     ← AP, captive DNS, REST e persistenza impostazioni
     photo_store.*       ← LittleFS, upload, boot image e slideshow

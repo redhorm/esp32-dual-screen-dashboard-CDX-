@@ -18,6 +18,7 @@
 #include "core/roadbook.h"
 #include "core/race.h"
 #include "core/ui_settings.h"
+#include "core/social_beta.h"
 #include "app/scene_dashboard.h"
 #include "app/scene_navigator.h"
 #include "services/config_portal.h"
@@ -27,9 +28,10 @@ static LGFX_DisplayB   dispB;
 static Simulator       sim;
 static Roadbook        roadbook;
 static RaceController  race;
+static SocialBetaEngine beta;
 static SceneDashboard  dash(dispA);
 static SceneNavigator  nav(dispB, roadbook);
-static ConfigPortal    portal;
+static ConfigPortal    portal(beta);
 
 // ── Shared frame (written by core 1, read by the nav task) ──────────────────
 struct SharedFrame {
@@ -37,6 +39,7 @@ struct SharedFrame {
     UiFx         fx;
     RunStats     stats;
     UiSettings   settings;
+    BetaFrame    beta;
 };
 static SharedFrame  shared;
 static portMUX_TYPE shareMux = portMUX_INITIALIZER_UNLOCKED;
@@ -73,6 +76,7 @@ static void navTask(void*) {
 
         uint32_t t0 = micros();
         nav.setSettings(f.settings);
+        nav.setBetaFrame(f.beta);
         nav.render(f.s, f.fx, f.stats);
         uint32_t t1 = micros();
         nav.push();
@@ -116,6 +120,7 @@ void setup() {
     sim.reset();
     roadbook.reset();
     race.reset(millis());
+    beta.reset(millis());
     shared.settings = settings;
 
     xTaskCreatePinnedToCore(navTask, "nav", 8192, nullptr, 1, nullptr, 0);
@@ -139,16 +144,20 @@ void loop() {
     }
 
     race.update(now, sim, roadbook);
+    beta.update(now, sim.state, race.fx());
+    const BetaFrame beta_frame = beta.frame(now);
 
     taskENTER_CRITICAL(&shareMux);
     shared.s     = sim.state;
     shared.fx    = race.fx();
     shared.stats = race.stats();
     shared.settings = settings;
+    shared.beta = beta_frame;
     taskEXIT_CRITICAL(&shareMux);
 
     uint32_t t0 = micros();
     dash.setSettings(settings);
+    dash.setBetaFrame(beta_frame);
     dash.render(sim.state, race.fx(), race.stats());
     uint32_t t1 = micros();
     dash.push();

@@ -6,6 +6,7 @@
 #include "core/race.h"
 #include "core/easing.h"
 #include "core/ui_settings.h"
+#include "core/social_beta.h"
 #include "services/photo_store.h"
 
 // Dashboard renderer for Display A — ST7735  160×80 landscape
@@ -17,6 +18,7 @@ public:
     explicit SceneDashboard(lgfx::LGFX_Device& disp);
     void init();
     void setSettings(const UiSettings& settings) { _settings = settings; }
+    void setBetaFrame(const BetaFrame& beta) { _beta = beta; }
     void render(const VehicleState& s, const UiFx& fx, const RunStats& stats);
     void push();
 
@@ -24,6 +26,7 @@ private:
     LGFX_Sprite        _spr;
     lgfx::LGFX_Device& _disp;
     UiSettings          _settings;
+    BetaFrame           _beta;
     PhotoFrameState     _photoFrame;
     bool                _bootPhotoLoaded = false;
 
@@ -40,6 +43,8 @@ private:
     void _renderThemedLive(const VehicleState& s, const UiFx& fx,
                            const RunStats& stats);
     void _renderThemedFinish(const UiFx& fx, const RunStats& stats);
+    bool _renderBetaTakeover(const UiFx& fx);
+    void _drawBetaBadge();
 
     // Layout building blocks (all coordinates in Lay:: constants)
     void _drawFrame();

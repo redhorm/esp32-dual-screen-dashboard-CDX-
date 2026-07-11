@@ -6,7 +6,55 @@
 #include "settings_page.h"
 #include "photo_store.h"
 
-ConfigPortal::ConfigPortal() : _server(80) {}
+namespace {
+const char* betaModeName(BetaMode mode) {
+    switch (mode) {
+        case BetaMode::SHOW: return "moment";
+        case BetaMode::HYPE: return "callout";
+        case BetaMode::GAME: return "game";
+        default:             return "dashboard";
+    }
+}
+const char* gameStatusName(RockGameStatus status) {
+    switch (status) {
+        case RockGameStatus::COUNTDOWN: return "countdown";
+        case RockGameStatus::PLAYING:   return "playing";
+        case RockGameStatus::CRASHED:   return "crashed";
+        case RockGameStatus::FINISHED:  return "finished";
+        default:                        return "idle";
+    }
+}
+const char* gateResultName(GateResult result) {
+    switch (result) {
+        case GateResult::PERFECT: return "perfect";
+        case GateResult::CLEAN:   return "clean";
+        case GateResult::HIT:     return "hit";
+        default:                  return "none";
+    }
+}
+void copyDisplaySafe(char* out, size_t len, const String& source, bool allow_at = false) {
+    if (!len) return;
+    size_t n = 0;
+    for (size_t i = 0; i < source.length() && n + 1 < len; i++) {
+        char c = source[i];
+        if (c >= 'a' && c <= 'z') c -= 32;
+        bool safe = (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') ||
+                    c == ' ' || c == '.' || c == '_' || c == '-' ||
+                    (allow_at && c == '@');
+        if (safe) out[n++] = c;
+    }
+    while (n && out[n - 1] == ' ') n--;
+    out[n] = '\0';
+}
+uint16_t accentFromName(const String& value) {
+    if (value == "amber") return 0xFD03;
+    if (value == "cyan")  return 0x67BF;
+    if (value == "sand")  return 0xDE73;
+    return 0xCFE4;
+}
+}
+
+ConfigPortal::ConfigPortal(SocialBetaEngine& beta) : _server(80), _beta(beta) {}
 
 void ConfigPortal::_load() {
     _prefs.begin("ultra4-ui", true);
@@ -25,6 +73,19 @@ void ConfigPortal::_load() {
     _settings.photo_transition = _prefs.getUChar("photoFx", 1) > 1 ? 1 : _prefs.getUChar("photoFx", 1);
     _settings.photo_random = _prefs.getBool("photoRnd", false);
     _settings.photo_overlay = _prefs.getBool("photoOvl", true);
+    BetaConfig beta = _beta.config();
+    String value = _prefs.getString("bCall", beta.callsign);
+    value.toCharArray(beta.callsign, sizeof(beta.callsign));
+    value = _prefs.getString("bTeam", beta.team);
+    value.toCharArray(beta.team, sizeof(beta.team));
+    value = _prefs.getString("bHandle", beta.handle);
+    value.toCharArray(beta.handle, sizeof(beta.handle));
+    value = _prefs.getString("bNumber", beta.number);
+    value.toCharArray(beta.number, sizeof(beta.number));
+    beta.accent = _prefs.getUShort("bAccent", beta.accent);
+    beta.best_game_score = _prefs.getULong("bGameBest", beta.best_game_score);
+    beta.game_wins = _prefs.getUShort("bGameWins", beta.game_wins);
+    _beta.setConfig(beta);
     _prefs.end();
 }
 
@@ -44,6 +105,14 @@ void ConfigPortal::_save() {
     _prefs.putUChar("photoFx", _settings.photo_transition);
     _prefs.putBool("photoRnd", _settings.photo_random);
     _prefs.putBool("photoOvl", _settings.photo_overlay);
+    const BetaConfig& beta = _beta.config();
+    _prefs.putString("bCall", beta.callsign);
+    _prefs.putString("bTeam", beta.team);
+    _prefs.putString("bHandle", beta.handle);
+    _prefs.putString("bNumber", beta.number);
+    _prefs.putUShort("bAccent", beta.accent);
+    _prefs.putULong("bGameBest", beta.best_game_score);
+    _prefs.putUShort("bGameWins", beta.game_wins);
     _prefs.end();
 }
 
@@ -160,6 +229,120 @@ void ConfigPortal::_finishUpload() {
                  _upload_ok ? "{\"ok\":true}" : "{\"ok\":false}");
 }
 
+void ConfigPortal::_sendCapabilities() {
+    char json[320];
+    snprintf(json, sizeof(json),
+        "{\"ok\":true,\"protocol\":2,\"version\":\"%s\",\"features\":["
+        "\"liveMirror\",\"moments\",\"spotter\",\"badges\",\"reelForge\",\"rockLineRush\"],"
+        "\"maxClients\":%u,\"stateHz\":4,\"inputHz\":8}",
+        SOCIAL_BETA_VERSION, CONFIG_AP_MAX_CLIENTS);
+    _server.sendHeader("Cache-Control", "no-store");
+    _server.send(200, "application/json", json);
+}
+
+void ConfigPortal::_sendBetaState() {
+    uint32_t now = millis();
+    BetaFrame f = _beta.frame(now);
+    char json[1400];
+    snprintf(json, sizeof(json),
+        "{\"ok\":true,\"version\":\"%s\",\"nowMs\":%lu,\"mode\":\"%s\","
+        "\"identity\":{\"callsign\":\"%s\",\"team\":\"%s\",\"handle\":\"%s\","
+        "\"number\":\"%s\",\"accent\":%u},"
+        "\"vehicle\":{\"speedMph\":%.1f,\"rpm\":%.0f,\"gear\":%u,\"heading\":%.0f,"
+        "\"batteryV\":%.1f,\"activeWp\":%u},"
+        "\"moment\":{\"name\":\"%s\",\"ageMs\":%lu},"
+        "\"callout\":{\"name\":\"%s\",\"text\":\"%s\",\"ageMs\":%lu},"
+        "\"badges\":{\"mask\":%lu,\"latest\":\"%s\",\"ageMs\":%lu},"
+        "\"game\":{\"status\":\"%s\",\"result\":\"%s\",\"x\":%d,\"safeX\":%d,"
+        "\"speed\":%u,\"distanceToGate\":%u,\"progress\":%u,\"score\":%lu,"
+        "\"combo\":%u,\"lives\":%u,\"gate\":%u,\"gateTotal\":%u,\"phaseMs\":%lu,"
+        "\"bestScore\":%lu,\"wins\":%u}}",
+        SOCIAL_BETA_VERSION, (unsigned long)now, betaModeName(f.mode),
+        f.identity.callsign, f.identity.team, f.identity.handle, f.identity.number,
+        f.identity.accent, f.speed_mph, f.rpm, f.gear, f.heading_deg, f.battery_v,
+        f.active_wp, SocialBetaEngine::showName(f.show_program), (unsigned long)f.mode_ms,
+        SocialBetaEngine::hypeName(f.hype), f.hype_text, (unsigned long)f.mode_ms,
+        (unsigned long)f.badge_mask, SocialBetaEngine::badgeName(f.latest_badge),
+        (unsigned long)f.badge_age_ms, gameStatusName(f.game.status),
+        gateResultName(f.game.last_result), f.game.line_x, f.game.safe_x,
+        f.game.speed, f.game.distance_to_gate, f.game.progress_permille,
+        (unsigned long)f.game.score, f.game.combo, f.game.lives, f.game.gate,
+        f.game.total_gates, (unsigned long)f.game.phase_ms,
+        (unsigned long)f.identity.best_game_score, f.identity.game_wins);
+    _server.sendHeader("Cache-Control", "no-store");
+    _server.send(200, "application/json", json);
+}
+
+void ConfigPortal::_sendProfile() { _sendBetaState(); }
+
+void ConfigPortal::_saveProfile() {
+    BetaConfig config = _beta.config();
+    copyDisplaySafe(config.callsign, sizeof(config.callsign), _server.arg("callsign"));
+    copyDisplaySafe(config.team, sizeof(config.team), _server.arg("team"));
+    copyDisplaySafe(config.handle, sizeof(config.handle), _server.arg("handle"), true);
+    copyDisplaySafe(config.number, sizeof(config.number), _server.arg("number"));
+    config.accent = accentFromName(_server.arg("accent"));
+    if (!config.callsign[0] || !config.team[0] || !config.number[0]) {
+        _server.send(400, "application/json", "{\"ok\":false,\"error\":\"invalid profile\"}");
+        return;
+    }
+    _beta.setConfig(config);
+    _save();
+    _server.send(200, "application/json", "{\"ok\":true}");
+}
+
+void ConfigPortal::_setMoment() {
+    String action = _server.arg("action");
+    if (action == "stop") {
+        _beta.stopShow();
+        _server.send(200, "application/json", "{\"ok\":true}");
+        return;
+    }
+    String type = _server.arg("type");
+    ShowProgram program = ShowProgram::MUD_SPLASH;
+    if (type == "water_ford") program = ShowProgram::WATER_FORD;
+    else if (type == "night_raid") program = ShowProgram::NIGHT_RAID;
+    else if (type == "winch_pull") program = ShowProgram::WINCH_PULL;
+    else if (type == "send_it") program = ShowProgram::SEND_IT;
+    _beta.startShow(program, millis());
+    _server.send(200, "application/json", "{\"ok\":true}");
+}
+
+void ConfigPortal::_setCallout() {
+    String type = _server.arg("type");
+    HypeReaction cue = HypeReaction::CUSTOM;
+    if (type == "left") cue = HypeReaction::LEFT;
+    else if (type == "right") cue = HypeReaction::RIGHT;
+    else if (type == "stop") cue = HypeReaction::STOP;
+    else if (type == "water") cue = HypeReaction::WATER;
+    else if (type == "clear") cue = HypeReaction::CLEAR;
+    else if (type == "winch") cue = HypeReaction::WINCH;
+    else if (type == "champion") cue = HypeReaction::CHAMPION;
+    char custom[25] = "";
+    copyDisplaySafe(custom, sizeof(custom), _server.arg("text"));
+    _beta.triggerHype(cue, custom, millis());
+    _server.send(200, "application/json", "{\"ok\":true}");
+}
+
+void ConfigPortal::_startGame() {
+    _beta.startGame(millis());
+    _sendBetaState();
+}
+
+void ConfigPortal::_inputGame() {
+    int steer = _server.arg("steer").toInt();
+    bool throttle = _server.arg("throttle").toInt() > 0;
+    _beta.controlGame(steer, throttle, millis());
+    _sendBetaState();
+}
+
+void ConfigPortal::_gameAction() {
+    String action = _server.arg("action");
+    if (action == "restart") _beta.startGame(millis());
+    else _beta.stopGame();
+    _sendBetaState();
+}
+
 bool ConfigPortal::begin() {
     bool fs_ok = photoStore.begin();
     _load();
@@ -173,6 +356,15 @@ bool ConfigPortal::begin() {
     _server.on("/", HTTP_GET, [this] { _sendPortal(); });
     _server.on("/api/settings", HTTP_GET, [this] { _sendSettings(); });
     _server.on("/api/settings", HTTP_POST, [this] { _saveSettings(); });
+    _server.on("/api/v2/capabilities", HTTP_GET, [this] { _sendCapabilities(); });
+    _server.on("/api/v2/state", HTTP_GET, [this] { _sendBetaState(); });
+    _server.on("/api/v2/profile", HTTP_GET, [this] { _sendProfile(); });
+    _server.on("/api/v2/profile", HTTP_POST, [this] { _saveProfile(); });
+    _server.on("/api/v2/moment", HTTP_POST, [this] { _setMoment(); });
+    _server.on("/api/v2/callout", HTTP_POST, [this] { _setCallout(); });
+    _server.on("/api/v2/game/start", HTTP_POST, [this] { _startGame(); });
+    _server.on("/api/v2/game/input", HTTP_POST, [this] { _inputGame(); });
+    _server.on("/api/v2/game/action", HTTP_POST, [this] { _gameAction(); });
     _server.on("/api/photos", HTTP_GET, [this] { _sendPhotos(); });
     _server.on("/api/photos/delete", HTTP_POST, [this] { _deletePhoto(); });
     _server.on("/api/boot/delete", HTTP_POST, [this] { _deleteBoot(); });
@@ -188,7 +380,12 @@ bool ConfigPortal::begin() {
     _server.on("/generate_204", HTTP_ANY, [this] { _sendPortal(); });
     _server.on("/hotspot-detect.html", HTTP_ANY, [this] { _sendPortal(); });
     _server.on("/connecttest.txt", HTTP_ANY, [this] { _sendPortal(); });
-    _server.onNotFound([this] { _sendPortal(); });
+    _server.onNotFound([this] {
+        if (_server.uri().startsWith("/api/"))
+            _server.send(404, "application/json", "{\"ok\":false,\"error\":\"not found\"}");
+        else
+            _sendPortal();
+    });
     _server.begin();
     return ok && fs_ok;
 }
@@ -196,5 +393,6 @@ bool ConfigPortal::begin() {
 void ConfigPortal::handle() {
     _dns.processNextRequest();
     _server.handleClient();
+    if (_beta.consumeConfigDirty()) _save();
 }
 #endif

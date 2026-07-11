@@ -409,6 +409,7 @@ void SceneDashboard::render(const VehicleState& s, const UiFx& fx,
     } else if (fx.phase != Phase::BOOT) {
         _bootPhotoLoaded = false;
     }
+    if (_renderBetaTakeover(fx)) return;
     if (_settings.photo_mode_enabled && (_settings.photo_target & 0x01) &&
         photoStore.drawFrame(_spr, false, _photoFrame, _settings, fx.now_ms))
         return;
@@ -419,6 +420,7 @@ void SceneDashboard::render(const VehicleState& s, const UiFx& fx,
             case Phase::LIVE:   _renderThemedLive(s, fx, stats); break;
             case Phase::FINISH: _renderThemedFinish(fx, stats);  break;
         }
+        _drawBetaBadge();
         return;
     }
 
@@ -427,6 +429,7 @@ void SceneDashboard::render(const VehicleState& s, const UiFx& fx,
         case Phase::FINISH: _renderFinish(s, fx, stats);      break;
         case Phase::LIVE:   _renderLive(s, fx, stats);        break;
     }
+    _drawBetaBadge();
 }
 
 #endif // NATIVE_BUILD

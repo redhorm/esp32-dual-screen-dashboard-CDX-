@@ -4,6 +4,20 @@
 > La versione AP/temi/foto precedente è conservata nel branch
 > `codex/ap-dashboard-themes`; questa beta vive in `codex/social-beta`.
 
+## Guida completa illustrata
+
+La guida professionale dalla A alla Z, con logo, lista materiali, cablaggio,
+installazione senza Homebrew, flash, portale AP, foto, funzioni social, gioco,
+API, manutenzione e troubleshooting è disponibile qui:
+
+**[Apri la guida PDF](output/pdf/Guida_Completa_ESP32_Dual_Screen_SEND_SYNC.pdf)**
+
+Per rigenerarla dopo una modifica al progetto:
+
+```bash
+python3 tools/build_project_guide.py
+```
+
 Due display SPI indipendenti pilotati in parallelo (DMA su due host SPI separati):
 
 | Display | Pannello | Risoluzione | Ruolo | Host SPI | Target FPS |

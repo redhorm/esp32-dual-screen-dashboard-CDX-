@@ -1,21 +1,33 @@
 # ESP32-S3 Dual Display — RC Ultra4 Dashboard + Waypoint Navigator
 
-> **Social Beta `2.0.0-beta.1` — SEND//SYNC**
+> **Experience Beta `3.0.0-beta.2` — RIFT//RUN**
 > La versione AP/temi/foto precedente è conservata nel branch
-> `codex/ap-dashboard-themes`; questa beta vive in `codex/social-beta`.
+> `codex/ap-dashboard-themes`; questa beta continua nel branch `codex/social-beta`.
 
-## Guida completa illustrata
+## Inizia qui
 
-La guida professionale dalla A alla Z, con logo, lista materiali, cablaggio,
-installazione senza Homebrew, flash, portale AP, foto, funzioni social, gioco,
-API, manutenzione e troubleshooting è disponibile qui:
+Per installare e usare il dispositivo senza termini tecnici:
 
-**[Apri la guida PDF](output/pdf/Guida_Completa_ESP32_Dual_Screen_SEND_SYNC.pdf)**
+**[Apri la guida rapida PDF - 8 pagine](output/pdf/Guida_Rapida_ESP32_Dual_Screen.pdf)**
 
-Per rigenerarla dopo una modifica al progetto:
+Per preparare e installare il firmware con un solo comando:
 
 ```bash
-python3 tools/build_project_guide.py
+# macOS / Linux
+python3 tools/flash_dashboard.py --flash
+
+# Windows
+py tools\flash_dashboard.py --flash
+```
+
+Al primo utilizzo rispondi `S` quando il tool propone PlatformIO. Viene installato
+solo dentro il progetto: non serve Homebrew. Internet è richiesto soltanto per
+scaricare gli strumenti la prima volta.
+
+Rigenerazione documenti:
+
+```bash
+python3 tools/build_mass_guide.py
 ```
 
 Due display SPI indipendenti pilotati in parallelo (DMA su due host SPI separati):
@@ -55,8 +67,8 @@ roadbook sono anti-aliased (`drawWideLine`/`fillSmoothCircle`).
 
 ## Wow pass
 
-- **Font smooth VLW** — Barlow Condensed Bold (OFL) subsettato in 3 taglie
-  (44/20/12 px, ~32 KB flash totali) embedded come header C e renderizzato
+- **Font smooth VLW** — Barlow Condensed Bold (OFL) subsettato in 4 taglie
+  (44/30/20/12 px, ~44 KB flash totali) embedded come header C e renderizzato
   anti-aliased. Rigenerazione: `python3 tools/make_vlw.py` (richiede Pillow).
   Ogni scena ha la propria istanza `UiFonts`: il cursore del DataWrapper VLW è
   stato mutabile, condividerlo tra i due task (core diversi) sarebbe una race.
@@ -128,55 +140,45 @@ Le immagini ottimizzate vivono nella partizione LittleFS da circa 4,9 MB. La
 dissolvenza usa un dithering progressivo senza allocare un secondo framebuffer
 240×240, preservando RAM e DMA dei display.
 
-## Social Beta — cinque funzioni
+Ogni coppia pilota/copilota viene prima validata in staging e poi pubblicata con
+un unico commit. Un trasferimento interrotto non occupa uno slot, non lascia JPEG
+parziali e non cancella una precedente immagine di boot valida. L'API distingue
+formato, rete, filesystem, dimensione e memoria realmente piena.
+Ogni import usa inoltre un transaction ID e un lease di 30 secondi: due telefoni
+connessi nello stesso momento non possono mescolare le rispettive coppie A/B.
 
-### 1. Dual Live Mirror
+## Esperienza unica: RIFT//RUN
 
-Il portale ricostruisce in Canvas i due cockpit e mostra speed, RPM, gear e
-modalità a 4 Hz. Non viene trasmesso un framebuffer: il browser disegna dai
-pochi valori JSON, mantenendo basso il carico Wi-Fi.
+`RIFT//RUN` è un'unica sequenza cinematografica deterministica da 13,8 secondi,
+costruita per essere ripresa con il telefono. La Jeep nasce nel Canvas del
+telefono, attraversa i pannelli nell'ordine scelto, apre un
+portale topografico e chiude con callsign, team e numero del mezzo.
 
-### 2. Moment Director
-
-Cinque takeover coordinati usano lo stesso timestamp sui due display e sul
-telefono: **Mud Splash**, **Water Ford**, **Night Raid**, **Winch Pull** e
-**Send It**. Sono animazioni a primitive, senza immagini o nuove allocazioni.
-
-### 3. Spotter Squad
-
-Il copilota può inviare LEFT, RIGHT, STOP, WATER, LINE CLEAR, WINCH e CHAMPION.
-I cue prendono temporaneamente il controllo di entrambi gli schermi; STOP usa
-rosso e contrasto massimo. Il telefono vibra quando la funzione è supportata.
-
-### 4. Trail Badges
-
-Il firmware sblocca automaticamente cinque achievement durante la run:
-SEND IT 55, REDLINE KING, 4X4 HERO, CLEAN LINE e STAGE CRUSHER. Lo sblocco è
-sincronizzato sui display e diventa un elemento del poster social.
-
-### 5. Reel Forge
-
-Reel Forge compone sul telefono un poster JPEG 1080×1920 con foto del mezzo,
-team, callsign, numero, handle, telemetria e badge. La foto resta locale al
-browser. Web Share viene usato quando disponibile; sugli altri dispositivi c'è
-il salvataggio JPEG. Per pubblicare online bisogna riconnettere il telefono a
-Internet dopo aver creato il poster sulla rete AP.
+- un solo comando a pressione prolungata, con countdown di sincronizzazione;
+- tre disposizioni fisiche: telefono→pilota→copilota,
+  copilota→telefono→pilota oppure impatto simultaneo;
+- timeline autorevole ESP32 e animazione telefono locale a 60 FPS;
+- WebAudio, vibrazione e foto hero opzionale, senza cloud né app;
+- renderer a primitive sui display: nessun nuovo framebuffer o asset pesante;
+- ritorno automatico alla dashboard originale al termine.
 
 ### Digital Garage
 
 Callsign, team, handle, numero e colore accent sono salvati in NVS e riutilizzati
-da Moment Director, display, gioco e Reel Forge. I testi sono filtrati al set di
+da RIFT//RUN, display e gioco. I testi sono filtrati al set di
 caratteri realmente disponibile nei font embedded.
 
-## Mini-gioco: Rock Line Rush
+## Mini-gioco: NEON TRAIL RUSH '86
 
-Rock Line Rush è server-authoritative: il telefono invia solo sterzo e throttle,
+`NEON TRAIL RUSH '86` è server-authoritative: il telefono invia solo sterzo e throttle,
 mentre l'ESP32 calcola fisica, linea sicura, gate, collisioni, vite, combo e
 punteggio. Lo stesso `RockGameSnapshot` POD viene copiato nello `SharedFrame`:
 
-- dashboard 160×80: trail top-down, score, vite, combo, velocità e progresso;
-- navigatore 240×240: trail prospettico, gate/massi e Jeep animata;
-- web UI: Canvas 480×360, touch LEFT/THROTTLE/RIGHT e tastiera WASD;
+- modalità attract con `INSERT COIN`, countdown 3-2-1-GO e finale con rank;
+- dashboard 160×80 e navigatore 240×240: sole synthwave, montagne, griglia,
+  gate wireframe, Jeep, flash incidente e HUD arcade;
+- web UI 480×360 a 60 FPS con volante analogico e leva a T verticale;
+- tastiera WASD/frecce, controlli accessibili e neutralizzazione su perdita focus;
 - 12 gate, 3 vite, perfect/clean/hit e record persistente;
 - watchdog a 650 ms: se il telefono sparisce, sterzo e gas tornano neutri.
 
@@ -189,11 +191,17 @@ Il gioco riusa i framebuffer esistenti e non alloca sprite aggiuntivi.
 | GET | `/api/v2/capabilities` | versione e feature supportate |
 | GET | `/api/v2/state` | snapshot live completo |
 | GET/POST | `/api/v2/profile` | Digital Garage |
-| POST | `/api/v2/moment` | avvia/ferma Moment Director |
-| POST | `/api/v2/callout` | cue Spotter Squad |
-| POST | `/api/v2/game/start` | nuova partita |
+| POST | `/api/v2/rift/start` | arma e avvia RIFT//RUN |
+| POST | `/api/v2/rift/stop` | chiude la sequenza |
+| POST | `/api/v2/game/start` | INSERT COIN / nuova partita |
 | POST | `/api/v2/game/input` | sterzo e throttle |
-| POST | `/api/v2/game/action` | quit/restart |
+| POST | `/api/v2/game/action` | enter/quit/restart |
+| POST | `/api/photos/commit` | pubblica una coppia foto validata |
+| POST | `/api/photos/abort` | annulla lo staging foto |
+| POST | `/api/boot/commit` | pubblica la nuova coppia boot |
+| POST | `/api/boot/abort` | annulla lo staging boot |
+| POST | `/api/upload/{photo,boot}-{a,b}` | carica i due JPEG nello staging |
+| POST | `/api/{photos,boot}/delete` | elimina foto o immagine boot |
 
 ## Pinout (ESP32-S3 DevKitC-1)
 
@@ -274,8 +282,8 @@ src/
     noise.h             ← value noise deterministico (jitter, vibrazione)
     compass.h           ← geometria nastro bussola tape-style
     formatter.{h,cpp}   ← formattazione valori in buffer (no heap)
-    rock_line_game.*    ← motore deterministico del mini-gioco
-    social_beta.*       ← mode director, spotter, badge e identità
+    rock_line_game.*    ← motore deterministico del mini-gioco arcade
+    experience.*        ← timeline RIFT, identità rig e regia takeover
   hal/
     display_a.h         ← LGFX device ST7735S su SPI2_HOST + DMA
     display_b.h         ← LGFX device ST7789  su SPI3_HOST + DMA
@@ -283,14 +291,14 @@ src/
     scene_dashboard.*   ← render 160×80 (sprite full-frame)
     scene_navigator.*   ← render 240×240 (sprite full-frame)
     scene_*_themes.cpp  ← Baja Amber, Night Ops, Trail Topo
-    scene_social_beta.cpp ← momenti, cue, badge e Rock Line Rush
+    scene_experience.cpp  ← RIFT//RUN e NEON TRAIL RUSH sui due pannelli
   services/
     config_portal.*     ← AP, captive DNS, REST e persistenza impostazioni
-    photo_store.*       ← LittleFS, upload, boot image e slideshow
+    photo_store.*       ← LittleFS, commit transazionale, boot e slideshow
     settings_page.h     ← web app responsive embedded nel firmware
   main.cpp              ← loop core 1 = sim + dashboard 30 FPS
                           task core 0 = navigator 12 FPS
-test/test_core/         ← unit test Unity (roadbook, simulatore, formatter)
+test/test_core/         ← unit test Unity (core, RIFT, arcade e regressioni)
 ```
 
 - **Frame rate disaccoppiati**: `DASH_FRAME_MS` (33 ms) e `NAV_FRAME_MS` (80 ms) in config.h.

@@ -17,13 +17,15 @@
 #include "core/compass.h"
 #include "core/ui_settings.h"
 #include "core/rock_line_game.h"
-#include "core/social_beta.h"
+#include "core/experience.h"
 #include <type_traits>
 
 static_assert(std::is_trivially_copyable<RockGameSnapshot>::value,
               "game snapshot must remain safe for SharedFrame copies");
-static_assert(std::is_trivially_copyable<BetaFrame>::value,
-              "beta frame must remain safe for SharedFrame copies");
+static_assert(std::is_trivially_copyable<ExperienceFrame>::value,
+              "experience frame must remain safe for SharedFrame copies");
+static_assert(sizeof(RockGameSnapshot) <= 64,
+              "game snapshot must remain lightweight");
 
 void setUp() {}
 void tearDown() {}
@@ -775,11 +777,11 @@ static void test_ui_numeric_clamps() {
     TEST_ASSERT_EQUAL_UINT16(3500, clampU16(9000, 500, 3500));
 }
 
-// ── Social beta / Rock Line Rush ─────────────────────────────────────
+// ── RIFT//RUN / Neon Trail Rush '86 ──────────────────────────────────
 
 static void enterGamePlay(RockLineGame& game, uint32_t& now) {
     game.start(0);
-    now = 2200;
+    now = 3200;
     game.update(now);
     TEST_ASSERT_EQUAL_INT((int)RockGameStatus::PLAYING,
                           (int)game.snapshot(now).status);
@@ -810,12 +812,12 @@ static void test_rock_game_countdown_and_safe_line() {
     game.start(100);
     TEST_ASSERT_EQUAL_INT((int)RockGameStatus::COUNTDOWN,
                           (int)game.snapshot(100).status);
-    game.update(2299);
+    game.update(3299);
     TEST_ASSERT_EQUAL_INT((int)RockGameStatus::COUNTDOWN,
-                          (int)game.snapshot(2299).status);
-    game.update(2300);
+                          (int)game.snapshot(3299).status);
+    game.update(3300);
     TEST_ASSERT_EQUAL_INT((int)RockGameStatus::PLAYING,
-                          (int)game.snapshot(2300).status);
+                          (int)game.snapshot(3300).status);
     for (int i = 0; i < 12; i++) {
         int x = RockLineGame::safeLine(i);
         TEST_ASSERT_TRUE(x >= -65 && x <= 65);
@@ -850,25 +852,51 @@ static void test_rock_game_hit_costs_life() {
     TEST_ASSERT_EQUAL_INT((int)GateResult::HIT, (int)s.last_result);
 }
 
-static void test_social_beta_unlocks_and_mode_priority() {
-    SocialBetaEngine beta; beta.reset(0);
-    VehicleState s; s.speed_mph = 60; s.rpm = REDLINE_RPM;
-    s.four_wd_lock = true;
-    UiFx fx; fx.phase = Phase::LIVE; fx.now_ms = 1000;
-    beta.update(1000, s, fx);
-    BetaFrame f = beta.frame(1000);
-    TEST_ASSERT_TRUE(f.badge_mask & (1UL << (int)TrailBadge::SEND_IT));
-    TEST_ASSERT_TRUE(f.badge_mask & (1UL << (int)TrailBadge::REDLINE));
-    TEST_ASSERT_TRUE(f.badge_mask & (1UL << (int)TrailBadge::FOUR_BY_FOUR));
+static void test_rock_game_attract_inputs_and_watchdog() {
+    RockLineGame game; game.enterArcade(100);
+    TEST_ASSERT_EQUAL_INT((int)RockGameStatus::ATTRACT,(int)game.snapshot(600).status);
+    game.start(1000); game.update(4200);
+    game.control(140,true,4200);
+    RockGameSnapshot live=game.snapshot(4200);
+    TEST_ASSERT_EQUAL_INT8(100,live.steering);
+    TEST_ASSERT_EQUAL_UINT8(1,live.throttle);
+    game.update(4901);
+    RockGameSnapshot safe=game.snapshot(4901);
+    TEST_ASSERT_EQUAL_INT8(0,safe.steering);
+    TEST_ASSERT_EQUAL_UINT8(0,safe.throttle);
+}
 
-    beta.startShow(ShowProgram::NIGHT_RAID, 1100);
-    TEST_ASSERT_EQUAL_INT((int)BetaMode::SHOW, (int)beta.frame(1200).mode);
-    beta.triggerHype(HypeReaction::STOP, nullptr, 1200);
-    TEST_ASSERT_EQUAL_INT((int)BetaMode::HYPE, (int)beta.frame(1300).mode);
-    beta.startGame(1400);
-    TEST_ASSERT_EQUAL_INT((int)BetaMode::GAME, (int)beta.frame(1400).mode);
-    beta.stopGame();
-    TEST_ASSERT_EQUAL_INT((int)BetaMode::NORMAL, (int)beta.frame(1500).mode);
+static void test_rift_timeline_and_game_priority() {
+    ExperienceEngine experience; experience.reset(100);
+    RiftFrame armed=experience.startRift(1000,0);
+    TEST_ASSERT_EQUAL_INT((int)RiftPhase::ARMED,(int)armed.phase);
+    TEST_ASSERT_EQUAL_UINT32(3500,armed.start_at_ms);
+    TEST_ASSERT_EQUAL_INT((int)ExperienceMode::RIFT,(int)experience.frame(3499).mode);
+    TEST_ASSERT_EQUAL_INT((int)RiftPhase::BLACKOUT,(int)experience.frame(3500).rift.phase);
+    TEST_ASSERT_EQUAL_INT((int)RiftPhase::SCAN,(int)experience.frame(4700).rift.phase);
+    experience.startGame(5000);
+    TEST_ASSERT_EQUAL_INT((int)ExperienceMode::GAME,(int)experience.frame(5000).mode);
+    experience.stopGame();
+    TEST_ASSERT_EQUAL_INT((int)ExperienceMode::NORMAL,(int)experience.frame(5100).mode);
+}
+
+static void test_rift_layout_clamp_end_and_millis_wrap() {
+    ExperienceEngine experience; experience.reset(0);
+    RiftFrame layout=experience.startRift(2000,1);
+    TEST_ASSERT_EQUAL_UINT8(1,layout.layout);
+    TEST_ASSERT_EQUAL_INT((int)ExperienceMode::NORMAL,
+                          (int)experience.frame(layout.start_at_ms+RIFT_DURATION_MS).mode);
+
+    layout=experience.startRift(9000,99);
+    TEST_ASSERT_EQUAL_UINT8(0,layout.layout);
+
+    ExperienceEngine wrapped; wrapped.reset(UINT32_MAX-1200);
+    RiftFrame armed=wrapped.startRift(UINT32_MAX-1000,2);
+    TEST_ASSERT_EQUAL_UINT32(1499,armed.start_at_ms);
+    TEST_ASSERT_EQUAL_INT((int)RiftPhase::ARMED,
+                          (int)wrapped.frame(UINT32_MAX-100).rift.phase);
+    TEST_ASSERT_EQUAL_INT((int)RiftPhase::BLACKOUT,
+                          (int)wrapped.frame(1499).rift.phase);
 }
 
 // ── Runner ───────────────────────────────────────────────────────────────────
@@ -944,7 +972,9 @@ int main(int, char**) {
     RUN_TEST(test_rock_game_countdown_and_safe_line);
     RUN_TEST(test_rock_game_clean_gate_scores_combo);
     RUN_TEST(test_rock_game_hit_costs_life);
-    RUN_TEST(test_social_beta_unlocks_and_mode_priority);
+    RUN_TEST(test_rock_game_attract_inputs_and_watchdog);
+    RUN_TEST(test_rift_timeline_and_game_priority);
+    RUN_TEST(test_rift_layout_clamp_end_and_millis_wrap);
 
     return UNITY_END();
 }

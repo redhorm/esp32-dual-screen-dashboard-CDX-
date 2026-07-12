@@ -8,7 +8,7 @@
 #include "core/easing.h"
 #include "ui_fonts.h"
 #include "core/ui_settings.h"
-#include "core/social_beta.h"
+#include "core/experience.h"
 #include "services/photo_store.h"
 
 // Navigator renderer for Display B — ST7789  240×240
@@ -18,7 +18,7 @@ public:
     SceneNavigator(lgfx::LGFX_Device& disp, const Roadbook& rb);
     void init();
     void setSettings(const UiSettings& settings) { _settings = settings; }
-    void setBetaFrame(const BetaFrame& beta) { _beta = beta; }
+    void setExperienceFrame(const ExperienceFrame& frame) { _experience = frame; }
     void render(const VehicleState& s, const UiFx& fx, const RunStats& stats);
     void push();
 
@@ -28,7 +28,7 @@ private:
     const Roadbook&    _rb;
     UiFonts            _fonts;
     UiSettings          _settings;
-    BetaFrame           _beta;
+    ExperienceFrame     _experience;
     PhotoFrameState     _photoFrame;
     bool                _bootPhotoLoaded = false;
 
@@ -45,8 +45,7 @@ private:
     void _renderThemedLive(const VehicleState& s, const UiFx& fx);
     void _renderThemedFinish(const UiFx& fx, const RunStats& stats);
     void _drawThemedRow(int y, const Waypoint& wp, bool active, bool alert_on);
-    bool _renderBetaTakeover(const UiFx& fx);
-    void _drawBetaBadge();
+    bool _renderExperienceTakeover(const UiFx& fx);
 
     // Live-frame building blocks
     void _drawHeader(const UiFx& fx);

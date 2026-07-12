@@ -3,6 +3,7 @@
 
 enum class RockGameStatus : uint8_t {
     IDLE,
+    ATTRACT,
     COUNTDOWN,
     PLAYING,
     CRASHED,
@@ -30,12 +31,18 @@ struct RockGameSnapshot {
     uint8_t gate = 0;
     uint8_t total_gates = 12;
     uint32_t phase_ms = 0;
+    int8_t steering = 0;           // echoed analog wheel input, -100..100
+    uint8_t throttle = 0;          // latched arcade T-lever
+    uint16_t world_distance = 0;   // stable animation clock for renderers
+    uint16_t result_age_ms = 0xFFFF;
+    uint32_t elapsed_ms = 0;
 };
 
 // Deterministic, allocation-free off-road line game. It has no Arduino
 // dependencies and is covered by the native host test suite.
 class RockLineGame {
 public:
+    void enterArcade(uint32_t now_ms);
     void start(uint32_t now_ms);
     void stop();
     void control(int steer, bool throttle, uint32_t now_ms);
@@ -56,7 +63,14 @@ private:
     uint32_t _phase_t0 = 0;
     uint32_t _last_ms = 0;
     uint32_t _last_input_ms = 0;
+    uint32_t _result_t0 = 0;
+    uint32_t _play_started_ms = 0;
+    uint32_t _elapsed_ms = 0;
+    bool _has_result = false;
+    bool _play_started = false;
     float _x = 0.0f;
+    float _steer_smoothed = 0.0f;
+    float _lateral_velocity = 0.0f;
     float _speed = 0.0f;
     float _distance = 0.0f;
     float _next_gate = 300.0f;

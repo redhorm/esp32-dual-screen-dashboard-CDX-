@@ -15,19 +15,47 @@ int16_t RockLineGame::safeLine(uint8_t gate) {
     return (int16_t)((int)(x % 131u) - 65);
 }
 
+void RockLineGame::enterArcade(uint32_t now_ms) {
+    _status = RockGameStatus::ATTRACT;
+    _last_result = GateResult::NONE;
+    _phase_t0 = _last_ms = _last_input_ms = now_ms;
+    _x = _speed = _distance = 0.0f;
+    _next_gate = GATE_SPACING;
+    _steer = 0;
+    _throttle = false;
+    _steer_smoothed = 0.0f;
+    _lateral_velocity = 0.0f;
+    _score = 0;
+    _combo = 0;
+    _lives = 3;
+    _gate = 0;
+    _result_t0 = 0;
+    _play_started_ms = 0;
+    _elapsed_ms = 0;
+    _has_result = false;
+    _play_started = false;
+}
+
 void RockLineGame::start(uint32_t now_ms) {
     _status = RockGameStatus::COUNTDOWN;
     _last_result = GateResult::NONE;
     _started_ms = _phase_t0 = _last_ms = _last_input_ms = now_ms;
     _x = _speed = _distance = 0.0f;
+    _steer_smoothed = _lateral_velocity = 0.0f;
     _next_gate = GATE_SPACING;
     _steer = 0; _throttle = false;
     _score = 0; _combo = 0; _lives = 3; _gate = 0;
+    _result_t0 = 0;
+    _play_started_ms = 0;
+    _elapsed_ms = 0;
+    _has_result = false;
+    _play_started = false;
 }
 
 void RockLineGame::stop() {
     _status = RockGameStatus::IDLE;
     _steer = 0; _throttle = false;
+    _steer_smoothed = _lateral_velocity = 0.0f;
 }
 
 void RockLineGame::control(int steer, bool throttle, uint32_t now_ms) {
@@ -57,6 +85,8 @@ void RockLineGame::_judgeGate(uint32_t now_ms) {
         _phase_t0 = now_ms;
         _speed *= 0.30f;
     }
+    _result_t0 = now_ms;
+    _has_result = true;
     _gate++;
     _next_gate += GATE_SPACING;
     if (_gate >= TOTAL_GATES) {
@@ -67,21 +97,24 @@ void RockLineGame::_judgeGate(uint32_t now_ms) {
 }
 
 void RockLineGame::update(uint32_t now_ms) {
-    if (_status == RockGameStatus::IDLE || _status == RockGameStatus::FINISHED) return;
+    if (_status == RockGameStatus::IDLE || _status == RockGameStatus::ATTRACT ||
+        _status == RockGameStatus::FINISHED) return;
 
     uint32_t dt_ms = now_ms - _last_ms;
     _last_ms = now_ms;
     if (dt_ms > 100) dt_ms = 100;
 
     if (_status == RockGameStatus::COUNTDOWN) {
-        if (now_ms - _phase_t0 >= 2200) {
+        if (now_ms - _phase_t0 >= 3200) {
             _status = RockGameStatus::PLAYING;
             _phase_t0 = now_ms;
+            _play_started_ms = now_ms;
+            _play_started = true;
         }
         return;
     }
     if (_status == RockGameStatus::CRASHED) {
-        if (now_ms - _phase_t0 >= 700) {
+        if (now_ms - _phase_t0 >= 900) {
             _status = RockGameStatus::PLAYING;
             _phase_t0 = now_ms;
             _last_result = GateResult::NONE;
@@ -95,11 +128,19 @@ void RockLineGame::update(uint32_t now_ms) {
     }
 
     float dt = dt_ms * 0.001f;
-    float target = _throttle ? 230.0f : 95.0f;
-    float response = _throttle ? 3.2f : 2.0f;
+    float target = _throttle ? 245.0f : 78.0f;
+    float response = _throttle ? 3.8f : 2.4f;
     _speed += (target - _speed) * clampf(response * dt, 0.0f, 1.0f);
-    _x = clampf(_x + _steer * 1.25f * dt, -90.0f, 90.0f);
+    float steer_target = _steer / 100.0f;
+    _steer_smoothed += (steer_target - _steer_smoothed) * clampf(7.5f * dt, 0.0f, 1.0f);
+    float lateral_target = _steer_smoothed * (72.0f + _speed * 0.22f);
+    _lateral_velocity += (lateral_target - _lateral_velocity) * clampf(8.0f * dt, 0.0f, 1.0f);
+    _x = clampf(_x + _lateral_velocity * dt, -90.0f, 90.0f);
+    if ((_x <= -90.0f && _lateral_velocity < 0.0f) ||
+        (_x >= 90.0f && _lateral_velocity > 0.0f))
+        _lateral_velocity = 0.0f;
     _distance += _speed * dt;
+    if (_play_started) _elapsed_ms = now_ms - _play_started_ms;
 
     if (_distance >= _next_gate && _gate < TOTAL_GATES)
         _judgeGate(now_ms);
@@ -122,5 +163,13 @@ RockGameSnapshot RockLineGame::snapshot(uint32_t now_ms) const {
     s.gate = _gate;
     s.total_gates = TOTAL_GATES;
     s.phase_ms = now_ms - _phase_t0;
+    s.steering = _steer;
+    s.throttle = _throttle ? 1 : 0;
+    s.world_distance = (uint16_t)((uint32_t)_distance & 0xFFFFu);
+    if (_last_result != GateResult::NONE && _has_result) {
+        uint32_t age = now_ms - _result_t0;
+        s.result_age_ms = age > 0xFFFEu ? 0xFFFEu : (uint16_t)age;
+    }
+    s.elapsed_ms = _elapsed_ms;
     return s;
 }

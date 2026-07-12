@@ -21,10 +21,10 @@ HERE = Path(__file__).parent
 TTF = HERE / "fonts" / "BarlowCondensed-Bold.ttf"
 OUT_DIR = HERE.parent / "src" / "assets"
 
-CHARSET_FULL = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ .:%/-!"
+CHARSET_FULL = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ .:%/-!_"
 FONTS = [
     # (name, px size, charset)
-    ("speed44", 44, "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ .:-"),
+    ("speed44", 44, "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ .:/-!_"),
     ("hero30",  30, "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ .:-"),
     ("med20",   20, CHARSET_FULL),
     ("small12", 12, CHARSET_FULL),

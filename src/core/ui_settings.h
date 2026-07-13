@@ -6,14 +6,19 @@
 // same critical-section protected frame used by the two display tasks.
 enum class UiTheme : uint8_t {
     CLASSIC_RALLY = 0,
-    BAJA_AMBER    = 1,
-    NIGHT_OPS     = 2,
-    TRAIL_TOPO    = 3,
+    REALISM       = 1,
+    STOCK_OFFROAD = 2,
+};
+
+enum class UiLanguage : uint8_t {
+    ITALIAN = 0,
+    ENGLISH = 1,
 };
 
 struct UiSettings {
     UiTheme driver_theme    = UiTheme::CLASSIC_RALLY;
     UiTheme navigator_theme = UiTheme::CLASSIC_RALLY;
+    UiLanguage language     = UiLanguage::ITALIAN;
     bool    use_kmh         = USE_KMH;
     bool    use_celsius     = USE_CELSIUS;
     uint8_t driver_brightness    = 220;
@@ -29,9 +34,15 @@ struct UiSettings {
 };
 
 inline UiTheme sanitizeTheme(uint8_t value) {
-    return value <= static_cast<uint8_t>(UiTheme::TRAIL_TOPO)
+    return value <= static_cast<uint8_t>(UiTheme::STOCK_OFFROAD)
         ? static_cast<UiTheme>(value)
         : UiTheme::CLASSIC_RALLY;
+}
+
+inline UiLanguage sanitizeLanguage(uint8_t value) {
+    return value <= static_cast<uint8_t>(UiLanguage::ENGLISH)
+        ? static_cast<UiLanguage>(value)
+        : UiLanguage::ITALIAN;
 }
 
 inline uint8_t sanitizeBrightness(int value) {
@@ -48,9 +59,12 @@ inline uint16_t clampU16(int value, int lo, int hi) {
 
 inline const char* themeName(UiTheme theme) {
     switch (theme) {
-        case UiTheme::BAJA_AMBER: return "Baja Amber";
-        case UiTheme::NIGHT_OPS:  return "Night Ops";
-        case UiTheme::TRAIL_TOPO: return "Trail Topo";
-        default:                  return "Classic Rally";
+        case UiTheme::REALISM:       return "Realism";
+        case UiTheme::STOCK_OFFROAD: return "Stock Offroad";
+        default:                     return "Classic Rally";
     }
+}
+
+inline const char* languageName(UiLanguage language) {
+    return language == UiLanguage::ENGLISH ? "English" : "Italiano";
 }

@@ -578,7 +578,10 @@ def build_firmware(
     argv = [*pio, "run", "--environment", config.environment]
     title = "1/2 - PREPARAZIONE FIRMWARE" if for_flash else "PREPARAZIONE FIRMWARE"
     run_phase(title, argv, "build", dry_run, ui)
-    ui.ok("Firmware preparato correttamente.")
+    if dry_run:
+        ui.ok("Simulazione: nessun firmware e stato compilato.")
+    else:
+        ui.ok("Firmware preparato correttamente.")
 
 
 def flash_firmware(
@@ -595,7 +598,10 @@ def flash_firmware(
         port,
     ]
     run_phase("2/2 - INSTALLAZIONE SULLA SCHEDA", argv, "flash", dry_run, ui)
-    ui.ok("FLASH COMPLETATO: la dashboard si riavviera automaticamente.")
+    if dry_run:
+        ui.ok("Simulazione: nessun dato e stato scritto sulla scheda.")
+    else:
+        ui.ok("FLASH COMPLETATO: la dashboard si riavviera automaticamente.")
 
 
 def open_monitor(

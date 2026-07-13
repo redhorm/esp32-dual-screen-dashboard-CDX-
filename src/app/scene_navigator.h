@@ -19,6 +19,8 @@ public:
     void init();
     void setSettings(const UiSettings& settings) { _settings = settings; }
     void setExperienceFrame(const ExperienceFrame& frame) { _experience = frame; }
+    void setPortalCredentials(bool visible, const char* ssid,
+                              const char* password);
     void render(const VehicleState& s, const UiFx& fx, const RunStats& stats);
     void push();
 
@@ -31,6 +33,9 @@ private:
     ExperienceFrame     _experience;
     PhotoFrameState     _photoFrame;
     bool                _bootPhotoLoaded = false;
+    bool                _portalCredentialsVisible = false;
+    char                _portalSsid[24] = "";
+    char                _portalPassword[16] = "";
 
     // Display-value smoothing / scroll animation (core logic)
     SlideAnim _scroll;   // roadbook slides between waypoints, never snaps
@@ -44,8 +49,12 @@ private:
     void _renderThemedBoot(const UiFx& fx);
     void _renderThemedLive(const VehicleState& s, const UiFx& fx);
     void _renderThemedFinish(const UiFx& fx, const RunStats& stats);
+    void _renderStockBoot(const UiFx& fx);
+    void _renderStockLive(const VehicleState& s, const UiFx& fx);
+    void _renderStockFinish(const UiFx& fx, const RunStats& stats);
     void _drawThemedRow(int y, const Waypoint& wp, bool active, bool alert_on);
     bool _renderExperienceTakeover(const UiFx& fx);
+    void _renderPortalCredentials();
 
     // Live-frame building blocks
     void _drawHeader(const UiFx& fx);

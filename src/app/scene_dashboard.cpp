@@ -4,6 +4,7 @@
 #include "scene_dashboard.h"
 #include "core/formatter.h"
 #include "core/anim.h"
+#include "core/ui_i18n.h"
 #include "config.h"
 
 // ── Palette (RGB565) — racing light-blue theme ──────────────────────────────
@@ -63,6 +64,53 @@ void SceneDashboard::init() {
 
 void SceneDashboard::push() {
     _spr.pushSprite(&_disp, 0, 0);
+}
+
+void SceneDashboard::setPortalCredentials(bool visible, const char* ssid,
+                                          const char* password) {
+    // Suppress the overlay while replacing bounded, NUL-terminated copies.
+    _portalCredentialsVisible = false;
+    snprintf(_portalSsid, sizeof(_portalSsid), "%s", ssid ? ssid : "");
+    snprintf(_portalPassword, sizeof(_portalPassword), "%s",
+             password ? password : "");
+    _portalCredentialsVisible = visible;
+}
+
+void SceneDashboard::_renderPortalCredentials() {
+    constexpr uint16_t BG     = 0x1082;  // warm graphite
+    constexpr uint16_t PANEL  = 0x2104;
+    constexpr uint16_t ORANGE = 0xFC40;
+    constexpr uint16_t SAND   = 0xE6F3;
+    constexpr uint16_t DIM    = 0x9CD3;
+
+    _spr.fillScreen(BG);
+    _spr.fillRect(0, 0, Lay::W, 18, ORANGE);
+    _spr.drawRect(1, 1, Lay::W - 2, Lay::H - 2, ORANGE);
+
+    _spr.setTextSize(1);
+    _spr.setTextDatum(lgfx::MC_DATUM);
+    _spr.setFont(&lgfx::fonts::Font2);
+    _spr.setTextColor(BG, ORANGE);
+    _spr.drawString(uiText(_settings.language, "ABBINA IL MEZZO",
+                           "PAIR THIS RIG"), Lay::W / 2, 9);
+
+    _spr.fillRoundRect(5, 20, Lay::W - 10, 20, 3, PANEL);
+    _spr.fillRoundRect(5, 42, Lay::W - 10, 20, 3, PANEL);
+    _spr.setFont(&lgfx::fonts::Font0);
+    _spr.setTextDatum(lgfx::TC_DATUM);
+    _spr.setTextColor(DIM, PANEL);
+    _spr.drawString("SSID", Lay::W / 2, 21);
+    _spr.drawString(uiText(_settings.language, "PASSWORD", "PASSWORD"),
+                    Lay::W / 2, 43);
+    _spr.setTextColor(SAND, PANEL);
+    _spr.drawString(_portalSsid, Lay::W / 2, 30);
+    _spr.drawString(_portalPassword, Lay::W / 2, 52);
+
+    _spr.setTextDatum(lgfx::MC_DATUM);
+    _spr.setTextColor(ORANGE, BG);
+    _spr.drawString(uiText(_settings.language, "APRI  192.168.4.1",
+                           "OPEN  192.168.4.1"), Lay::W / 2, 71);
+    _spr.setTextDatum(lgfx::TL_DATUM);
 }
 
 // ── Text helper ──────────────────────────────────────────────────────────────
@@ -270,7 +318,9 @@ void SceneDashboard::_drawAlertBanner(const UiFx& fx) {
     _spr.drawRoundRect(2, y, Lay::W - 4, bh, Lay::BOX_R, border);
 
     char msg[32];
-    snprintf(msg, sizeof(msg), "%s %s", fx.alert_info, fx.alert_note);
+    snprintf(msg, sizeof(msg), "%s %s",
+             localizedRoadbookText(_settings.language, fx.alert_info),
+             localizedRoadbookText(_settings.language, fx.alert_note));
     _drawCenteredText(msg, 2, y, Lay::W - 4, bh, &lgfx::fonts::Font2, border);
 }
 
@@ -313,7 +363,8 @@ void SceneDashboard::_renderBoot(const VehicleState& s, const UiFx& fx) {
                          Lay::RPMBOX_H, "8888", &lgfx::fonts::Font4,
                          Col::INK, "RPM", 2);
         _drawGearBox(8, fx);
-        _drawCenteredText("SELF CHECK", 0, Lay::BOT_Y, Lay::W, Lay::BOT_H,
+        _drawCenteredText(uiText(_settings.language, "CONTROLLO", "SELF CHECK"),
+                          0, Lay::BOT_Y, Lay::W, Lay::BOT_H,
                           &lgfx::fonts::Font0, Col::INK);
 
     } else {
@@ -321,7 +372,8 @@ void SceneDashboard::_renderBoot(const VehicleState& s, const UiFx& fx) {
         if (Anim::pulse(t, 220)) {
             _spr.fillRoundRect(50, 28, 60, 22, Lay::BOX_R, Col::BOX_BG);
             _spr.drawRoundRect(50, 28, 60, 22, Lay::BOX_R, Col::INK);
-            _drawCenteredText("READY", 50, 28, 60, 22,
+            _drawCenteredText(uiText(_settings.language, "PRONTO", "READY"),
+                              50, 28, 60, 22,
                               &lgfx::fonts::Font2, Col::INK);
         }
     }
@@ -388,7 +440,8 @@ void SceneDashboard::_renderFinish(const VehicleState& s, const UiFx& fx,
     _drawCheckerStrip(0, 8, fx.now_ms);
     _drawCheckerStrip(Lay::H - 8, 8, fx.now_ms);
 
-    _drawCenteredText("FINISH", 0, 12, Lay::W, 26,
+    _drawCenteredText(uiText(_settings.language, "ARRIVO", "FINISH"),
+                      0, 12, Lay::W, 26,
                       &lgfx::fonts::Font4, Col::INK);
 
     char buf[10];
@@ -402,6 +455,10 @@ void SceneDashboard::_renderFinish(const VehicleState& s, const UiFx& fx,
 
 void SceneDashboard::render(const VehicleState& s, const UiFx& fx,
                             const RunStats& stats) {
+    if (_portalCredentialsVisible) {
+        _renderPortalCredentials();
+        return;
+    }
     if (_renderExperienceTakeover(fx)) return;
     if (fx.phase == Phase::BOOT && _settings.boot_image_enabled &&
         fx.phase_ms < _settings.boot_hold_ms && photoStore.hasBoot(false)) {
@@ -414,7 +471,16 @@ void SceneDashboard::render(const VehicleState& s, const UiFx& fx,
         photoStore.drawFrame(_spr, false, _photoFrame, _settings, fx.now_ms))
         return;
 
-    if (_settings.driver_theme != UiTheme::CLASSIC_RALLY) {
+    if (_settings.driver_theme == UiTheme::STOCK_OFFROAD) {
+        switch (fx.phase) {
+            case Phase::BOOT:   _renderStockBoot(s, fx);        break;
+            case Phase::LIVE:   _renderStockLive(s, fx, stats); break;
+            case Phase::FINISH: _renderStockFinish(fx, stats);  break;
+        }
+        return;
+    }
+
+    if (_settings.driver_theme == UiTheme::REALISM) {
         switch (fx.phase) {
             case Phase::BOOT:   _renderThemedBoot(s, fx);        break;
             case Phase::LIVE:   _renderThemedLive(s, fx, stats); break;

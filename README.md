@@ -1,16 +1,15 @@
-# ESP32-S3 Dual Display — RC Ultra4 Dashboard + Waypoint Navigator
+# ESP32-S3 Dual Screen — Ultra4 Microdash
 
-> **Experience Beta `3.0.0-beta.2` — RIFT//RUN**
-> La versione AP/temi/foto precedente è conservata nel branch
-> `codex/ap-dashboard-themes`; questa beta continua nel branch `codex/social-beta`.
+> Beta `4.1.0-beta.1` — tre dashboard, italiano/inglese, media, gioco arcade e
+> barra RTL. Tutto gira localmente sull’ESP32-S3: nessun cloud e
+> nessuna app da installare.
 
-## Inizia qui
+## Avvio rapido
 
-Per installare e usare il dispositivo senza termini tecnici:
+- [Istruzioni essenziali](START_HERE.md)
+- [Guida rapida illustrata](output/pdf/Guida_Rapida_ESP32_Dual_Screen.pdf)
 
-**[Apri la guida rapida PDF - 8 pagine](output/pdf/Guida_Rapida_ESP32_Dual_Screen.pdf)**
-
-Per preparare e installare il firmware con un solo comando:
+Per programmare o aggiornare la scheda, senza Homebrew:
 
 ```bash
 # macOS / Linux
@@ -20,318 +19,212 @@ python3 tools/flash_dashboard.py --flash
 py tools\flash_dashboard.py --flash
 ```
 
-Al primo utilizzo rispondi `S` quando il tool propone PlatformIO. Viene installato
-solo dentro il progetto: non serve Homebrew. Internet è richiesto soltanto per
-scaricare gli strumenti la prima volta.
+Al primo uso il tool può installare PlatformIO. Internet serve soltanto per
+scaricare gli strumenti; il dispositivo funziona offline.
 
-Rigenerazione documenti:
+## Collegamento dal telefono
 
-```bash
-python3 tools/build_mass_guide.py
-```
+1. Accendi il dispositivo e attendi circa 5 secondi.
+2. Leggi rete e password sui display.
+3. Collegati a `ULTRA4-DASH-XXXXXXXX`.
+4. Resta collegato anche se il telefono segnala “nessuna Internet”.
+5. Apri `http://192.168.4.1` se il portale non compare da solo.
 
-Due display SPI indipendenti pilotati in parallelo (DMA su due host SPI separati):
+La password `U4-…` è casuale, unica e persistente. Dopo la prima configurazione
+puoi rivedere le credenziali tenendo premuto **BOOT**. Il captive portal è
+compatibile con iOS, Android, Windows, macOS e Linux.
 
-| Display | Pannello | Risoluzione | Ruolo | Host SPI | Target FPS |
-|---|---|---|---|---|---|
-| A | ST7735S 0.96" | 160×80 | **Dashboard** stile cluster Jeep off-road | `SPI2_HOST` (FSPI) | 30+ |
-| B | ST7789 1.3" | 240×240 | **Waypoint Navigator** stile roadbook Ultra4 "WAY MAP" | `SPI3_HOST` (HSPI) | ~12 |
+### Prima configurazione
 
-Un simulatore physics-based (C++ puro, testabile su host) genera velocità, RPM, marce,
-batteria, temperatura e un odometro che fa avanzare i waypoint del roadbook demo (9 WP, ~12 mi, in loop).
+Sono richiesti soltanto:
 
-## Demo loop & FX
+- numero gara;
+- nome veicolo;
+- pilota.
 
-La state machine globale (`core/race.{h,cpp}`) orchestra: **BOOT → LIVE → FINISH → restart**,
-tutta a `millis()`, durate e soglie in `config.h` (sezione *Animation & FX*):
+I tre valori restano modificabili dalla HOME. Nessun campo riceve autofocus:
+su iPhone la pagina può essere fatta scorrere senza apertura forzata della
+tastiera.
 
-- **Boot cinematico** (~4 s): dash → wordmark ULTRA4 in fade, sweep RPM 0→max→0,
-  self-check strumenti; navigator sfasato di 0.8 s → "GPS ACQUIRING" con anello
-  satelliti che si accende, flash "SAT LOCK", poi tabella live.
-- **Shift light**: oltre `REDLINE_RPM` bordo dash e zona rossa RPM lampeggiano
-  rosso/bianco; a ogni cambio marcia il numero fa uno snap 130%→100% (`GEAR_SNAP_MS`).
-- **Waypoint alert**: a `ALERT_DIST_MI` (0.2 mi) da un WP pericoloso la riga rossa
-  del roadbook pulsa, il countdown nel footer diventa rosso e sulla dash appare il
-  banner warning ("L HAIRPIN SLOW !!") — i due schermi si parlano.
-- **Demo driver** (`DEMO_MODE 1`, `core/driver.cpp`): guida roadbook-aware con
-  staccate calcolate sulla distanza di frenata, punte a ~70 mph sul dritto,
-  hairpin a 12 mph. `DEMO_MODE 0` = vecchio ciclo throttle/brake fisso.
-- **Finish**: navigator con scacchiera animata + tempo stage (mm:ss.d), dash con
-  max speed / max RPM della run. Hold `FINISH_HOLD_MS` (4 s), poi riparte il giro.
-  Loop infinito senza fermi immagine.
+## Portale a cinque schede
 
-Frame time reale (render e push separati, avg/max per display) e heap libero
-loggati su seriale ogni `PROFILE_LOG_MS` (5 s). Durante gli FX critici della dash
-il navigator scala a `NAV_FRAME_SLOW_MS` per non rubare CPU. Frecce e dot del
-roadbook sono anti-aliased (`drawWideLine`/`fillSmoothCircle`).
-
-## Wow pass
-
-- **Font smooth VLW** — Barlow Condensed Bold (OFL) subsettato in 4 taglie
-  (44/30/20/12 px, ~44 KB flash totali) embedded come header C e renderizzato
-  anti-aliased. Rigenerazione: `python3 tools/make_vlw.py` (richiede Pillow).
-  Ogni scena ha la propria istanza `UiFonts`: il cursore del DataWrapper VLW è
-  stato mutabile, condividerlo tra i due task (core diversi) sarebbe una race.
-- **Easing ovunque** (`core/easing.h`): velocità con inseguimento smooth, barra
-  RPM stile VU meter (attack `RPM_ATTACK_MS`, release `RPM_RELEASE_MS`), scroll
-  del roadbook a slide (`SCROLL_MS`, clip sul corpo tabella), countdown footer
-  interpolato per il refresh a 12 FPS.
-- **Micro-vita** (`core/noise.h`, deterministico e seedabile): jitter RPM ±40 a
-  regime, sag batteria transiente sotto pieno carico con recupero lento, inerzia
-  termica asimmetrica (scalda in fretta, raffredda piano), micro-tremolio ±1 px
-  delle barre con ampiezza ∝ RPM (solo LIVE).
-- **Transizioni**: wipe orizzontale BOOT→LIVE coordinato tra i display (il nav
-  segue di `NAV_WIPE_LAG_MS`), spegnimento sequenziale strumenti LIVE→FINISH,
-  banner alert con slide-in ease-out e fade-out (mai un cut secco).
-- **Hero detail**: nastro bussola tape-style aeronautico in cima alla dash
-  (`core/compass.h`), tick ogni 15°, cardinali ogni 45°, marker centrale lime —
-  in moto perpetuo con l'heading simulato.
-
-## Portale Wi-Fi AP
-
-Il controller crea automaticamente un access point locale, senza bisogno di
-router o Internet:
-
-| Parametro | Valore predefinito |
+| Scheda | Contenuto |
 |---|---|
-| SSID | `ULTRA4-DASH` |
-| Password | `ultra4setup` |
-| Indirizzo | `http://192.168.4.1` |
+| **HOME** | riepilogo compatto del veicolo e telemetria essenziale |
+| **DASH** | tre grafiche, luminosità e unità di misura |
+| **MEDIA** | foto di avvio e cornice digitale, con anteprime compatte |
+| **GAME** | DESERT BLITZ e controlli di gioco |
+| **RTL** | barra WS2812, test luci e configurazione ESC |
 
-La rete e la password si cambiano in `include/config.h`. Il DNS captive reindirizza
-al portale i normali probe di iOS, Android e Windows. Le modifiche sono applicate
-in tempo reale e salvate in NVS (`Preferences`), quindi sopravvivono al riavvio.
+Il menu resta fisso in basso. Cambiando scheda gli input del gioco tornano
+neutrali e gli eventuali campi testuali perdono il focus.
 
-Dal portale si regolano indipendentemente:
+Il selettore **IT / EN** nell’intestazione cambia subito la lingua dell’intero
+sistema: portale, messaggi e testi sui due display. La scelta resta memorizzata.
 
-- tema grafico del display pilota e del display copilota;
-- luminosità dei due pannelli;
-- MPH/mi oppure km/h/km e °F oppure °C;
-- immagine di boot e durata;
-- modalità cornice digitale, display target, intervallo, ordine, transizione e overlay.
+## Grafiche cockpit
 
-### Temi cockpit
+- **Classic Rally** conserva il layout originale da gara.
+- **Race Realism** abbina un display pilota ispirato a Racepak IQ3S e una
+  navigazione copilota ispirata a onX Offroad.
+- **Auto di serie** ricrea un quadro strumenti OEM offroad: tachimetro centrale,
+  indicatori veicolo e navigazione coordinata sui due display.
 
-La grafica originale resta invariata come **Classic Rally**. Sono disponibili tre
-nuovi cockpit completi, ognuno con boot, live e finish dedicati su entrambi gli
-schermi:
+La shift strip superiore Race Realism usa filtro, isteresi e limite di
+variazione: con RPM stabile anche i LED restano stabili. Tutti gli elementi
+sono disegnati con primitive originali; il progetto non è affiliato ai marchi
+citati e non sostituisce strumentazione certificata.
 
-1. **Baja Amber** — strumentazione desert-race, tachimetro a segmenti e pannelli ambra;
-2. **Night Ops** — griglia NVG, ciano ad alta leggibilità e accenti lime;
-3. **Trail Topo** — palette expedition olive/sabbia, bussola e dettagli topografici.
+## Foto e cornice digitale
 
-Pilota e copilota possono usare temi diversi nello stesso momento.
+Il browser accetta **JPG, JPEG, PNG e WEBP**. La nuova area MEDIA separa
+chiaramente anteprima, selezione e azioni, quindi ottimizza l’immagine per i due
+display prima dell’invio. Nome, avanzamento e risultato restano visibili; i
+pulsanti vengono bloccati per evitare invii doppi.
 
-## Foto di boot e cornice digitale
+- immagine di avvio con durata e ritaglio regolabili;
+- fino a 24 foto nella cornice digitale;
+- display pilota, copilota o entrambi;
+- intervallo, ordine, transizione e informazioni sovrapposte regolabili;
+- anteprime persistenti anche dopo il refresh della pagina.
 
-Il selettore usa `accept="image/*"` e funziona dal browser di iPhone/iPad,
-Android, Windows, macOS e Linux. Il browser ridimensiona e converte localmente
-la foto in JPEG per i due formati reali (160×80 e 240×240) prima dell'upload:
-nessun originale ad alta risoluzione viene inviato o conservato sull'ESP32.
+Il backend monta esplicitamente la partizione LittleFS `littlefs`, con
+compatibilità per la precedente etichetta `spiffs`. Staging, verifica JPEG,
+backup e commit atomico impediscono che una connessione interrotta pubblichi
+file incompleti. All’avvio vengono recuperate automaticamente eventuali
+transazioni rimaste sospese.
 
-- una foto può essere usata come immagine di avvio su entrambi i display;
-- la galleria contiene fino a 24 foto, con rimozione singola dal portale;
-- il crop può essere `Riempi` o `Adatta` al momento dell'importazione;
-- lo slideshow può occupare il display pilota, il copilota o entrambi;
-- intervallo 3–120 s, ordine sequenziale/casuale, taglio o dissolvenza;
-- l'overlay opzionale mostra indice foto e countdown.
+## DESERT BLITZ
 
-Le immagini ottimizzate vivono nella partizione LittleFS da circa 4,9 MB. La
-dissolvenza usa un dithering progressivo senza allocare un secondo framebuffer
-240×240, preservando RAM e DMA dei display.
+Gioco offroad arcade semplice e immediato. L’ESP32 gestisce fisica, ostacoli,
+collisioni, vite, combo, punteggio e record; telefono e tastiera inviano solo i
+comandi.
 
-Ogni coppia pilota/copilota viene prima validata in staging e poi pubblicata con
-un unico commit. Un trasferimento interrotto non occupa uno slot, non lascia JPEG
-parziali e non cancella una precedente immagine di boot valida. L'API distingue
-formato, rete, filesystem, dimensione e memoria realmente piena.
-Ogni import usa inoltre un transaction ID e un lease di 30 secondi: due telefoni
-connessi nello stesso momento non possono mescolare le rispettive coppie A/B.
+- START, pausa/riprendi, fine partita e riavvio;
+- ostacoli ad alto contrasto sul display pilota;
+- touch: sinistra, destra e GAS;
+- tastiera: `←`/`→` oppure `A`/`D`, GAS con `↑`/`W`/spazio, pausa con `P`;
+- perdita del controller: sterzo e gas tornano automaticamente neutrali.
 
-## Esperienza unica: RIFT//RUN
+La scheda GAME è l’unica a usare la palette retrogaming.
 
-`RIFT//RUN` è un'unica sequenza cinematografica deterministica da 13,8 secondi,
-costruita per essere ripresa con il telefono. La Jeep nasce nel Canvas del
-telefono, attraversa i pannelli nell'ordine scelto, apre un
-portale topografico e chiude con callsign, team e numero del mezzo.
+## Barra RTL e ingresso ESC
 
-- un solo comando a pressione prolungata, con countdown di sincronizzazione;
-- tre disposizioni fisiche: telefono→pilota→copilota,
-  copilota→telefono→pilota oppure impatto simultaneo;
-- timeline autorevole ESP32 e animazione telefono locale a 60 FPS;
-- WebAudio, vibrazione e foto hero opzionale, senza cloud né app;
-- renderer a primitive sui display: nessun nuovo framebuffer o asset pesante;
-- ritorno automatico alla dashboard originale al termine.
+La barra prevista usa 16 LED WS2812 su **GPIO 4**. Profili disponibili:
 
-### Digital Garage
+- `RTL_S`;
+- `ULTRA4_4400`.
 
-Callsign, team, handle, numero e colore accent sono salvati in NVS e riutilizzati
-da RIFT//RUN, display e gioco. I testi sono filtrati al set di
-caratteri realmente disponibile nei font embedded.
+Comandi manuali: running, stop, left, right, hazard, reverse, dust e pit test.
+Un task dedicato e due watchdog mantengono l’uscita sicura anche durante upload
+lunghi o perdita del portale.
 
-## Mini-gioco: NEON TRAIL RUSH '86
+L’ingresso PWM ESC su **GPIO 5** è disabilitato di default. Quando viene
+installato e abilitato, il segnale viene normalizzato con smoothing, zona
+neutra, isteresi e rate limiting. La macchina a stati distingue:
 
-`NEON TRAIL RUSH '86` è server-authoritative: il telefono invia solo sterzo e throttle,
-mentre l'ESP32 calcola fisica, linea sicura, gate, collisioni, vite, combo e
-punteggio. Lo stesso `RockGameSnapshot` POD viene copiato nello `SharedFrame`:
+`FORWARD → NEUTRAL → BRAKING → REVERSE_ARMED → REVERSE`
 
-- modalità attract con `INSERT COIN`, countdown 3-2-1-GO e finale con rank;
-- dashboard 160×80 e navigatore 240×240: sole synthwave, montagne, griglia,
-  gate wireframe, Jeep, flash incidente e HUD arcade;
-- web UI 480×360 a 60 FPS con volante analogico e leva a T verticale;
-- tastiera WASD/frecce, controlli accessibili e neutralizzazione su perdita focus;
-- 12 gate, 3 vite, perfect/clean/hit e record persistente;
-- watchdog a 650 ms: se il telefono sparisce, sterzo e gas tornano neutri.
+Sono supportati tre comportamenti:
 
-Il gioco riusa i framebuffer esistenti e non alloca sprite aggiuntivi.
+- avanti / freno / retro;
+- crawler avanti / retro;
+- avanti / freno.
 
-### API beta
+Per un ESC da gara la retromarcia richiede freno, ritorno al neutro e un secondo
+comando confermato. Perciò la barra non confonde mai la prima frenata con la
+retromarcia: rosso in frenata, bianco soltanto nello stato reverse confermato.
+
+### Sicurezza elettrica
+
+- GPIO 4 è solo DATA: la barra richiede un’alimentazione 5 V separata,
+  dimensionata e protetta;
+- collega le masse e usa un level shifter 3,3→5 V adatto;
+- non collegare mai LED o GPIO direttamente ai 12 V;
+- il segnale ESC deve essere condizionato e limitato a 3,3 V;
+- la barra è scenografica e non sostituisce luci omologate o circuiti di
+  sicurezza indipendenti.
+
+## Hardware e pinout
+
+| Display | Pannello | Risoluzione | Ruolo | Host SPI |
+|---|---|---:|---|---|
+| A | ST7735S 0,96" | 160×80 | pilota | `SPI2_HOST` |
+| B | ST7789 1,3" | 240×240 | copilota | `SPI3_HOST` |
+
+| Segnale | Display A | Display B |
+|---|---:|---:|
+| MOSI | GPIO 11 | GPIO 13 |
+| SCLK | GPIO 12 | GPIO 14 |
+| CS | GPIO 10 | GPIO 15 / `-1` |
+| DC | GPIO 9 | GPIO 16 |
+| RST | GPIO 8 | GPIO 17 |
+| Backlight | GPIO 46 | GPIO 18 |
+
+| Espansione | GPIO | Stato iniziale |
+|---|---:|---|
+| Mostra credenziali / BOOT | 0 | attivo basso |
+| WS2812 DATA | 4 | controller attivo |
+| ESC PWM | 5 | disabilitato |
+
+I display lavorano a 3,3 V. Usa cavi SPI corti.
+
+## API locale
 
 | Metodo | Endpoint | Funzione |
 |---|---|---|
-| GET | `/api/v2/capabilities` | versione e feature supportate |
-| GET | `/api/v2/state` | snapshot live completo |
-| GET/POST | `/api/v2/profile` | Digital Garage |
-| POST | `/api/v2/rift/start` | arma e avvia RIFT//RUN |
-| POST | `/api/v2/rift/stop` | chiude la sequenza |
-| POST | `/api/v2/game/start` | INSERT COIN / nuova partita |
-| POST | `/api/v2/game/input` | sterzo e throttle |
-| POST | `/api/v2/game/action` | enter/quit/restart |
-| POST | `/api/photos/commit` | pubblica una coppia foto validata |
-| POST | `/api/photos/abort` | annulla lo staging foto |
-| POST | `/api/boot/commit` | pubblica la nuova coppia boot |
-| POST | `/api/boot/abort` | annulla lo staging boot |
-| POST | `/api/upload/{photo,boot}-{a,b}` | carica i due JPEG nello staging |
-| POST | `/api/{photos,boot}/delete` | elimina foto o immagine boot |
+| GET | `/api/v3/capabilities` | versione e funzioni disponibili |
+| GET | `/api/v3/state` | veicolo, gioco e ostacoli visibili |
+| GET/POST | `/api/v3/profile` | i tre dati del veicolo |
+| POST | `/api/v2/game/start` | nuova partita |
+| POST | `/api/v2/game/input` | sterzo e acceleratore |
+| POST | `/api/v2/game/action` | start, pause, resume, restart o quit |
+| GET | `/api/v3/rtl/state` | pixel, funzione e stato ESC |
+| POST | `/api/v3/rtl/config` | profilo RTL e taratura ESC |
+| POST | `/api/v3/rtl/command` | comando luce o reset |
+| GET/POST | `/api/settings` | dashboard e media |
+| GET | `/api/photos` | slot e stato LittleFS |
+| GET | `/api/media/{boot,photo}` | anteprima persistente |
+| POST | `/api/{photos,boot}/{commit,abort}` | transazione media |
+| POST | `/api/upload/{photo,boot}-{a,b}` | upload ottimizzato |
 
-## Pinout (ESP32-S3 DevKitC-1)
+Le risposte dinamiche usano `Cache-Control: no-store`. Frequenze nominali:
+stato 5 Hz, input gioco 10 Hz.
 
-Tutto il pinout e il tuning vivono in **`include/config.h`** — unico punto di modifica.
-
-### Display A — ST7735S 160×80 (Dashboard)
-
-| Segnale modulo | GPIO | Note |
-|---|---|---|
-| SDA / MOSI | **11** | FSPI MOSI |
-| SCL / SCLK | **12** | FSPI SCLK |
-| CS         | **10** | |
-| DC / A0    | **9**  | |
-| RST        | **8**  | `-1` in config.h se legato a 3.3 V |
-| BLK / BL   | **46** | PWM; `-1` se legato a 3.3 V |
-| VCC        | 3.3 V  | |
-| GND        | GND    | |
-
-### Display B — ST7789 240×240 (Navigator)
-
-| Segnale modulo | GPIO | Note |
-|---|---|---|
-| SDA / MOSI | **13** | HSPI MOSI |
-| SCL / SCLK | **14** | HSPI SCLK |
-| CS         | **15** | molti moduli 240×240 non hanno CS: lascia il pin libero e metti `-1` |
-| DC         | **16** | |
-| RST        | **17** | |
-| BLK / BL   | **18** | |
-| VCC        | 3.3 V  | |
-| GND        | GND    | |
-
-Cavi corti (<10 cm) per i clock a 40/80 MHz; se vedi glitch abbassa
-`DISP_A_SPI_HZ` / `DISP_B_SPI_HZ` in config.h.
-
-## Tuning ST7735 160×80 (leggi prima di dare la colpa al wiring!)
-
-I moduli 0.96" 160×80 usano una finestra 80×160 dentro una GRAM 132×162 e
-richiedono quasi sempre offset e spesso inversione colore. In `config.h`:
-
-| Sintomo | Rimedio |
-|---|---|
-| Immagine spostata / bordo di pixel random | ritocca `DISP_A_COL_OFFSET` (tipico **26**, a volte 24) e `DISP_A_ROW_OFFSET` (tipico **1**, a volte 0) |
-| Colori invertiti (sfondo bianco invece che nero) | inverti `DISP_A_INVERT` |
-| Rosso e blu scambiati | inverti `DISP_A_RGB_ORDER` |
-| Immagine capovolta | `DISP_A_ROTATION` 1 ↔ 3 (landscape), `DISP_B_ROTATION` 0 ↔ 2 |
-
-Per l'ST7789: quasi tutti i moduli 240×240 vogliono `DISP_B_INVERT = true` (già il default).
-
-## Build / Flash / Monitor
+## Build e verifica
 
 ```bash
-pio run                          # build firmware
-pio run -t upload                # flash (USB-C nativo, auto-reset 1200bps)
-pio device monitor               # monitor 115200 (stampa FPS e stato sim ogni 1s)
-pio test -e native               # unit test host-compiled (g++, nessun hardware)
-```
+pio run
+pio run -t upload
+pio device monitor
+pio test -e native
 
-Senza PlatformIO i test girano anche con g++ puro:
-
-```bash
-g++ -std=c++17 -DNATIVE_BUILD -I src -I include -I <unity> \
-    src/core/*.cpp test/test_core/test_main.cpp -o test_core && ./test_core
+python3 tools/preview_portal.py
+# http://127.0.0.1:8765
 ```
 
 ## Architettura
 
-```
-include/config.h        ← pin, offset, velocità SPI, unità (MPH/km/h, °F/°C)
-src/
-  core/                 ← C++ puro, ZERO dipendenze Arduino (testabile su host)
-    state.h             ← VehicleState condiviso tra i due display
-    simulator.{h,cpp}   ← fisica: throttle/brake → velocità/RPM/marce/batteria/temp
-    roadbook.{h,cpp}    ← stage demo 9 waypoint + avanzamento su odometro
-    driver.{h,cpp}      ← autopilot roadbook-aware (demo mode)
-    race.{h,cpp}        ← state machine BOOT/LIVE/FINISH, stats run, alert
-    anim.h              ← helper animazioni (pulse, ease, lerp565)
-    easing.h            ← curve easing, Follow (attack/release), SlideAnim
-    noise.h             ← value noise deterministico (jitter, vibrazione)
-    compass.h           ← geometria nastro bussola tape-style
-    formatter.{h,cpp}   ← formattazione valori in buffer (no heap)
-    rock_line_game.*    ← motore deterministico del mini-gioco arcade
-    experience.*        ← timeline RIFT, identità rig e regia takeover
-  hal/
-    display_a.h         ← LGFX device ST7735S su SPI2_HOST + DMA
-    display_b.h         ← LGFX device ST7789  su SPI3_HOST + DMA
-  app/
-    scene_dashboard.*   ← render 160×80 (sprite full-frame)
-    scene_navigator.*   ← render 240×240 (sprite full-frame)
-    scene_*_themes.cpp  ← Baja Amber, Night Ops, Trail Topo
-    scene_experience.cpp  ← RIFT//RUN e NEON TRAIL RUSH sui due pannelli
-  services/
-    config_portal.*     ← AP, captive DNS, REST e persistenza impostazioni
-    photo_store.*       ← LittleFS, commit transazionale, boot e slideshow
-    settings_page.h     ← web app responsive embedded nel firmware
-  main.cpp              ← loop core 1 = sim + dashboard 30 FPS
-                          task core 0 = navigator 12 FPS
-test/test_core/         ← unit test Unity (core, RIFT, arcade e regressioni)
+```text
+src/core/       simulazione, gara, gioco, ESC, shift light e logica RTL
+src/hal/        display, cattura PWM e uscita WS2812
+src/app/        scene Classic, Race Realism, Auto di serie e arcade
+src/services/   portale, persistenza, media e LittleFS
+test/           test nativi deterministici
+tools/          flash, anteprima e generatore guida
 ```
 
-- **Frame rate disaccoppiati**: `DASH_FRAME_MS` (33 ms) e `NAV_FRAME_MS` (80 ms) in config.h.
-- **Niente delay()**: il loop si autoregola con `millis()`, il task navigator con `vTaskDelayUntil()`.
-- **Due host SPI + DMA**: le push dei due sprite avvengono in parallelo su bus fisicamente separati; gli sprite sono forzati in RAM interna (`setPsram(false)`) per restare DMA-friendly.
+Il rendering non usa `delay()`. I due display hanno framebuffer e frequenze
+indipendenti; lo stato passa tra i task tramite snapshot compatti.
 
-### Pitfall noto (già gestito): `build_src_filter`
+## Problemi comuni
 
-In `platformio.ini` il filtro elenca esplicitamente `+<core/*.cpp>` ecc.:
-con il solo `+<*>` alcune versioni di PIO non linkano i .cpp nelle sottocartelle
-**silenziosamente** (il firmware compila ma i simboli mancano o usano stub).
-Se aggiungi una cartella sotto `src/`, aggiungila anche al filtro.
-
-## UI
-
-**Dashboard 160×80** — sfondo nero, accent lime: velocità grande al centro (7-seg),
-marcia D/1-5 in giallo con modalità AUTO/MAN, barra RPM a segmenti verde→giallo→rosso,
-angoli alti con batteria e temperatura + micro-barre, riga inferiore heading + 4WD LOCK.
-
-**Navigator 240×240** — header con GPS/SAT, titolo WAY MAP e orologio; tabella roadbook
-a righe bianche (DIST | freccia | INFO | TOT) con waypoint attivo evidenziato in giallo e
-pericoli in rosso, frecce disegnate con primitive (dritto, 45°, 90°, hairpin, guado, finish);
-colonna destra con SPEED / GEAR / RPM / 4WD; footer con heading e distanza al prossimo
-waypoint. La lista scorre da sola man mano che l'odometro simulato avanza.
-
-Per provare il portale senza hardware:
-
-```bash
-python3 tools/preview_portal.py
-# apri http://127.0.0.1:8765
-```
-
-## Unità
-
-`config.h`: `USE_KMH` (default `false` → MPH/mi come le reference) e `USE_CELSIUS`
-(default `false` → °F). Cambiale e tutta la UI si adegua.
+- **Rete assente:** attendi 5 secondi, poi scollega USB per 10 secondi.
+- **Pagina assente:** resta sulla rete del dispositivo e apri
+  `http://192.168.4.1`.
+- **Foto non caricata:** controlla il messaggio sotto la barra di avanzamento;
+  formato, rete, memoria e filesystem vengono distinti.
+- **Scheda non trovata durante il flash:** tieni premuto BOOT, premi e rilascia
+  RESET, rilascia BOOT e ripeti.
+- **Componente caldo, odore o cavo danneggiato:** scollega subito e fai
+  controllare il dispositivo.

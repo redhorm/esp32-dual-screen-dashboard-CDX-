@@ -1,18 +1,103 @@
 #ifndef NATIVE_BUILD
 #include <LittleFS.h>
+#include <esp_partition.h>
 #include "photo_store.h"
 
 PhotoStore photoStore;
 
+namespace {
+const esp_partition_t* findPhotoPartition(const char* label) {
+    return esp_partition_find_first(ESP_PARTITION_TYPE_DATA,
+                                    ESP_PARTITION_SUBTYPE_DATA_SPIFFS,
+                                    label);
+}
+
+bool mountPhotoPartition(const char* label) {
+    return LittleFS.begin(false, PHOTO_FS_BASE_PATH,
+                          PHOTO_FS_MAX_OPEN_FILES, label);
+}
+}
+
 bool PhotoStore::begin() {
-    _degraded=false;
-    _mutex = xSemaphoreCreateMutex();
-    if (!_mutex || !LittleFS.begin(true)) return false;
+    _ready = false;
+    _degraded = false;
+    _formatted_on_begin = false;
+    _recovered_on_begin = false;
+    _partition_label[0] = '\0';
+    _upload_error = PhotoUploadError::NONE;
+
+    if (!_mutex) _mutex = xSemaphoreCreateMutex();
+    if (!_mutex) {
+        _upload_error = PhotoUploadError::FILESYSTEM;
+        Serial.println("[photos] fs init failed: mutex unavailable");
+        return false;
+    }
+
+    const bool canonical_exists = findPhotoPartition(PHOTO_FS_PARTITION_LABEL) != nullptr;
+    const bool legacy_exists = findPhotoPartition(PHOTO_FS_LEGACY_PARTITION_LABEL) != nullptr;
+    const char* mounted_label = nullptr;
+
+    // Arduino-ESP32 2.x defaults LittleFS.begin() to partition label "spiffs".
+    // This project deliberately uses the clearer "littlefs" label, so always
+    // pass it explicitly.  The fallback keeps installations made with an older
+    // default partition table readable instead of formatting them.
+    if (canonical_exists && mountPhotoPartition(PHOTO_FS_PARTITION_LABEL)) {
+        mounted_label = PHOTO_FS_PARTITION_LABEL;
+    } else if (legacy_exists &&
+               mountPhotoPartition(PHOTO_FS_LEGACY_PARTITION_LABEL)) {
+        mounted_label = PHOTO_FS_LEGACY_PARTITION_LABEL;
+        Serial.println("[photos] fs mounted legacy partition label 'spiffs'");
+    }
+
+    if (!mounted_label) {
+        const char* recovery_label = canonical_exists
+            ? PHOTO_FS_PARTITION_LABEL
+            : (legacy_exists ? PHOTO_FS_LEGACY_PARTITION_LABEL : nullptr);
+        if (!recovery_label) {
+            _upload_error = PhotoUploadError::FILESYSTEM;
+            Serial.println("[photos] fs init failed: LittleFS partition not found");
+            return false;
+        }
+
+        // Retry once before formatting.  Formatting is only attempted on a
+        // partition proven to exist, which avoids erasing unrelated storage
+        // when a partition-table label is wrong.
+        if (mountPhotoPartition(recovery_label)) {
+            mounted_label = recovery_label;
+        } else {
+            Serial.printf("[photos] fs mount failed on '%s'; formatting partition\n",
+                          recovery_label);
+            // The failed begin above selected recovery_label inside LittleFS,
+            // so format() targets that exact partition.
+            if (LittleFS.format() && mountPhotoPartition(recovery_label)) {
+                mounted_label = recovery_label;
+                _formatted_on_begin = true;
+            }
+        }
+    }
+
+    if (!mounted_label) {
+        _upload_error = PhotoUploadError::FILESYSTEM;
+        Serial.println("[photos] fs recovery failed: storage remains unavailable");
+        return false;
+    }
+
+    snprintf(_partition_label, sizeof(_partition_label), "%s", mounted_label);
     _ready = true;
-    bool healthy=false;
+    bool healthy = false;
     if (_take()) { healthy=_scrubUnlocked(); _give(); }
-    _degraded=!healthy;
-    return healthy;
+    _degraded = !healthy;
+    if (!healthy) _upload_error = PhotoUploadError::FILESYSTEM;
+
+    const size_t total = LittleFS.totalBytes();
+    const size_t used = LittleFS.usedBytes();
+    Serial.printf("[photos] fs %s label='%s' total=%lu used=%lu formatted=%u recovered=%u\n",
+                  ready() ? "ready" : "degraded", _partition_label,
+                  static_cast<unsigned long>(total),
+                  static_cast<unsigned long>(used),
+                  _formatted_on_begin ? 1U : 0U,
+                  _recovered_on_begin ? 1U : 0U);
+    return ready();
 }
 
 bool PhotoStore::_take() {
@@ -53,12 +138,89 @@ uint32_t PhotoStore::_slotMaskUnlocked() {
 bool PhotoStore::_validJpegUnlocked(const char* path) {
     if (!LittleFS.exists(path)) return false;
     File file = LittleFS.open(path, "r");
-    if (!file || file.size() < PHOTO_MIN_JPEG_BYTES) { if (file) file.close(); return false; }
+    if (!file || file.size() < PHOTO_MIN_JPEG_BYTES) {
+        if (file) file.close();
+        return false;
+    }
+    const size_t file_size = file.size();
     uint8_t head[2] = {0,0}, tail[2] = {0,0};
-    bool ok = file.read(head,2) == 2 && file.seek(file.size()-2) && file.read(tail,2) == 2;
+    bool ok = file.read(head,2) == 2 && head[0] == 0xFF && head[1] == 0xD8 &&
+              file.seek(file_size-2) && file.read(tail,2) == 2 &&
+              tail[0] == 0xFF && tail[1] == 0xD9 && file.seek(2);
+
+    // Validate the JPEG segment structure and require a real frame header.
+    // Checking only SOI/EOI allowed arbitrary/corrupt payloads to be committed.
+    bool found_frame = false;
+    bool found_scan = false;
+    while (ok && file.position() + 4 < file_size) {
+        int prefix = file.read();
+        if (prefix < 0) { ok = false; break; }
+        if (prefix != 0xFF) continue;
+
+        int marker = file.read();
+        while (marker == 0xFF) marker = file.read();
+        if (marker < 0) { ok = false; break; }
+        if (marker == 0xD9) break;
+        if (marker == 0xDA) { found_scan = true; break; }
+        if (marker == 0x00 || marker == 0xD8 || marker == 0x01 ||
+            (marker >= 0xD0 && marker <= 0xD7)) continue;
+
+        const int hi = file.read();
+        const int lo = file.read();
+        if (hi < 0 || lo < 0) { ok = false; break; }
+        const size_t segment_len = (static_cast<size_t>(hi) << 8) |
+                                   static_cast<size_t>(lo);
+        if (segment_len < 2 || file.position() + segment_len - 2 > file_size) {
+            ok = false;
+            break;
+        }
+
+        const bool is_frame = marker >= 0xC0 && marker <= 0xCF &&
+                              marker != 0xC4 && marker != 0xC8 &&
+                              marker != 0xCC;
+        if (is_frame) {
+            if (segment_len < 11) { ok = false; break; }
+            const int precision = file.read();
+            const int height_hi = file.read();
+            const int height_lo = file.read();
+            const int width_hi = file.read();
+            const int width_lo = file.read();
+            const int components = file.read();
+            if (precision < 0 || height_hi < 0 || height_lo < 0 ||
+                width_hi < 0 || width_lo < 0 || components < 1 || components > 4 ||
+                segment_len != static_cast<size_t>(8 + 3 * components)) {
+                ok = false;
+                break;
+            }
+            const uint16_t height = static_cast<uint16_t>((height_hi << 8) | height_lo);
+            const uint16_t width = static_cast<uint16_t>((width_hi << 8) | width_lo);
+            if (!width || !height || width > 8192 || height > 8192) {
+                ok = false;
+                break;
+            }
+            found_frame = true;
+        }
+        if (!file.seek(file.position() + segment_len - 2 - (is_frame ? 6 : 0))) {
+            ok = false;
+            break;
+        }
+    }
     file.close();
-    return ok && head[0] == 0xFF && head[1] == 0xD8 &&
-           tail[0] == 0xFF && tail[1] == 0xD9;
+    return ok && found_frame && found_scan;
+}
+
+bool PhotoStore::_validUploadTarget(const char* path) const {
+    if (!path || !path[0]) return false;
+    if (strcmp(path, bootStagePath(false)) == 0 ||
+        strcmp(path, bootStagePath(true)) == 0) return true;
+    char allowed[20];
+    for (uint8_t slot = 0; slot < PHOTO_MAX_SLOTS; ++slot) {
+        photoStagePath(allowed, sizeof(allowed), slot, false);
+        if (strcmp(path, allowed) == 0) return true;
+        photoStagePath(allowed, sizeof(allowed), slot, true);
+        if (strcmp(path, allowed) == 0) return true;
+    }
+    return false;
 }
 
 bool PhotoStore::_recoverPairUnlocked(const char* target_a, const char* target_b,
@@ -142,16 +304,42 @@ bool PhotoStore::_commitPairUnlocked(const char* stage_a, const char* stage_b,
         _upload_error = PhotoUploadError::COMMIT_FAILED;
         return false;
     }
+
+    // A successful rename is not enough: re-open both final files before
+    // acknowledging the transaction so a refresh/reboot can only expose a
+    // complete, decodable pair.
+    if (!_validJpegUnlocked(target_a) || !_validJpegUnlocked(target_b)) {
+        LittleFS.remove(target_a);
+        LittleFS.remove(target_b);
+        if (had_pair &&
+            !_recoverPairUnlocked(target_a,target_b,backup_a,backup_b)) {
+            _degraded = true;
+        }
+        _upload_error = PhotoUploadError::COMMIT_FAILED;
+        return false;
+    }
     LittleFS.remove(backup_a);
     LittleFS.remove(backup_b);
     return true;
 }
 
 bool PhotoStore::_scrubUnlocked() {
-    bool healthy=true;
+    bool healthy = true;
+    bool recovery_needed = LittleFS.exists("/.upload.tmp");
     LittleFS.remove("/.upload.tmp");
     const char* boot_a = bootPath(false);
     const char* boot_b = bootPath(true);
+    const bool boot_a_exists = LittleFS.exists(boot_a);
+    const bool boot_b_exists = LittleFS.exists(boot_b);
+    const bool boot_a_valid = _validJpegUnlocked(boot_a);
+    const bool boot_b_valid = _validJpegUnlocked(boot_b);
+    recovery_needed = recovery_needed || LittleFS.exists(bootStagePath(false)) ||
+                      LittleFS.exists(bootStagePath(true)) ||
+                      LittleFS.exists("/.boot_a.bak") ||
+                      LittleFS.exists("/.boot_b.bak") ||
+                      boot_a_valid != boot_b_valid ||
+                      (boot_a_exists && !boot_a_valid) ||
+                      (boot_b_exists && !boot_b_valid);
     LittleFS.remove(bootStagePath(false));
     LittleFS.remove(bootStagePath(true));
     bool recovered=_recoverPairUnlocked(boot_a, boot_b, "/.boot_a.bak", "/.boot_b.bak");
@@ -163,11 +351,22 @@ bool PhotoStore::_scrubUnlocked() {
         photoStagePath(sa,sizeof(sa),i,false); photoStagePath(sb,sizeof(sb),i,true);
         snprintf(ba,sizeof(ba),"/.p%02u_a.bak",i);
         snprintf(bb,sizeof(bb),"/.p%02u_b.bak",i);
+        const bool a_exists = LittleFS.exists(a);
+        const bool b_exists = LittleFS.exists(b);
+        const bool a_valid = _validJpegUnlocked(a);
+        const bool b_valid = _validJpegUnlocked(b);
+        recovery_needed = recovery_needed || LittleFS.exists(sa) || LittleFS.exists(sb) ||
+                          LittleFS.exists(ba) || LittleFS.exists(bb) ||
+                          a_valid != b_valid || (a_exists && !a_valid) ||
+                          (b_exists && !b_valid);
         LittleFS.remove(sa); LittleFS.remove(sb);
         recovered=_recoverPairUnlocked(a,b,ba,bb);
         if(!recovered)recovered=_recoverPairUnlocked(a,b,ba,bb);
         healthy=healthy&&recovered;
     }
+    _recovered_on_begin = recovery_needed;
+    if (recovery_needed)
+        Serial.printf("[photos] fs recovery pass %s\n", healthy ? "completed" : "failed");
     return healthy;
 }
 
@@ -288,35 +487,68 @@ bool PhotoStore::beginUpload(const char* path) {
     _upload_error = PhotoUploadError::NONE;
     if (!ready()) { _upload_error=PhotoUploadError::FILESYSTEM; return false; }
     if (_upload_locked) { _upload_error=PhotoUploadError::BUSY; return false; }
+    if (!_validUploadTarget(path)) {
+        _upload_error = PhotoUploadError::INVALID_TRANSACTION;
+        Serial.println("[photos] upload rejected: invalid internal target");
+        return false;
+    }
     if (!_take()) { _upload_error=PhotoUploadError::BUSY; return false; }
     size_t total=LittleFS.totalBytes(), used=LittleFS.usedBytes();
     if (total <= used || total-used < PHOTO_STORAGE_RESERVE_BYTES) {
-        _upload_error=PhotoUploadError::NO_SPACE; _give(); return false;
+        _upload_error=PhotoUploadError::NO_SPACE;
+        Serial.printf("[photos] upload rejected: no space total=%lu used=%lu\n",
+                      static_cast<unsigned long>(total),
+                      static_cast<unsigned long>(used));
+        _give();
+        return false;
     }
     _upload_locked = true;
     _upload_target = path;
     _upload_bytes = 0;
+    _upload_free_at_start = total - used;
     _upload_limit = _upload_target.indexOf("_a.") >= 0
         ? PHOTO_DRIVER_MAX_BYTES : PHOTO_NAV_MAX_BYTES;
     LittleFS.remove("/.upload.tmp");
     _upload = LittleFS.open("/.upload.tmp", "w");
-    if (!_upload) { _upload_error=PhotoUploadError::FILESYSTEM; _upload_locked=false; _give(); return false; }
+    if (!_upload) {
+        _upload_error=PhotoUploadError::FILESYSTEM;
+        _upload_locked=false;
+        _upload_free_at_start=0;
+        Serial.println("[photos] upload failed: temporary file could not be opened");
+        _give();
+        return false;
+    }
+    Serial.printf("[photos] upload begin role=%s limit=%lu\n",
+                  _upload_limit == PHOTO_DRIVER_MAX_BYTES ? "driver" : "navigator",
+                  static_cast<unsigned long>(_upload_limit));
     _give();
     return true;
 }
 
 bool PhotoStore::writeUpload(const uint8_t* data, size_t len) {
-    if (!_upload_locked || !_upload) return false;
-    if (!_take()) { _upload_error=PhotoUploadError::BUSY; return false; }
-    if (_upload_bytes + len > _upload_limit) {
-        _upload_error=PhotoUploadError::TOO_LARGE; _give(); return false;
+    if (!_upload_locked || !_upload) {
+        _upload_error = PhotoUploadError::INVALID_TRANSACTION;
+        return false;
     }
-    size_t total=LittleFS.totalBytes(), used=LittleFS.usedBytes();
-    if (total <= used || len + PHOTO_STORAGE_RESERVE_BYTES > total-used) {
-        _upload_error=PhotoUploadError::NO_SPACE; _give(); return false;
+    if (!_take()) { _upload_error=PhotoUploadError::BUSY; return false; }
+    if (len > _upload_limit - _upload_bytes) {
+        _upload_error=PhotoUploadError::TOO_LARGE;
+        Serial.printf("[photos] upload stopped: image exceeds %lu bytes\n",
+                      static_cast<unsigned long>(_upload_limit));
+        _give();
+        return false;
+    }
+    if (_upload_bytes + len + PHOTO_STORAGE_RESERVE_BYTES > _upload_free_at_start) {
+        _upload_error=PhotoUploadError::NO_SPACE;
+        Serial.println("[photos] upload stopped: storage reserve would be crossed");
+        _give();
+        return false;
     }
     if (_upload.write(data,len) != len) {
-        _upload_error=PhotoUploadError::WRITE_FAILED; _give(); return false;
+        _upload_error=PhotoUploadError::WRITE_FAILED;
+        Serial.println("[photos] upload stopped: LittleFS write failed");
+        _give();
+        return false;
     }
     _upload_bytes += len;
     _give();
@@ -326,6 +558,7 @@ bool PhotoStore::writeUpload(const uint8_t* data, size_t len) {
 bool PhotoStore::endUpload(bool keep) {
     if (!_upload_locked) return false;
     if (!_take()) { _upload_error=PhotoUploadError::BUSY; return false; }
+    const size_t received_bytes = _upload_bytes;
     if (_upload) { _upload.flush(); _upload.close(); }
     bool valid = keep && _upload_error == PhotoUploadError::NONE &&
                  _upload_bytes >= PHOTO_MIN_JPEG_BYTES &&
@@ -339,9 +572,16 @@ bool PhotoStore::endUpload(bool keep) {
         if (!committed) _upload_error=PhotoUploadError::COMMIT_FAILED;
     }
     if (!committed) LittleFS.remove("/.upload.tmp");
+    if (!keep && _upload_error == PhotoUploadError::NONE)
+        _upload_error = PhotoUploadError::INTERRUPTED;
+    Serial.printf("[photos] upload %s bytes=%lu status=%s\n",
+                  committed ? "staged" : "discarded",
+                  static_cast<unsigned long>(received_bytes),
+                  uploadErrorName(_upload_error));
     _upload_locked = false;
     _upload_target = "";
     _upload_bytes = 0;
+    _upload_free_at_start = 0;
     _give();
     return committed;
 }
@@ -357,6 +597,9 @@ bool PhotoStore::commitSlotUpload(uint8_t slot) {
     snprintf(ba,sizeof(ba),"/.p%02u_a.bak",slot);
     snprintf(bb,sizeof(bb),"/.p%02u_b.bak",slot);
     bool ok=_commitPairUnlocked(sa,sb,a,b,ba,bb);
+    Serial.printf("[photos] gallery commit slot=%u status=%s\n",
+                  static_cast<unsigned>(slot),
+                  ok ? "ok" : uploadErrorName(_upload_error));
     _give();
     return ok;
 }
@@ -382,6 +625,8 @@ bool PhotoStore::commitBootUpload() {
     bool ok=_commitPairUnlocked(bootStagePath(false),bootStagePath(true),
                                 bootPath(false),bootPath(true),
                                 "/.boot_a.bak","/.boot_b.bak");
+    Serial.printf("[photos] boot commit status=%s\n",
+                  ok ? "ok" : uploadErrorName(_upload_error));
     _give();
     return ok;
 }
@@ -430,6 +675,12 @@ size_t PhotoStore::usedBytes() {
 }
 size_t PhotoStore::totalBytes() {
     if (!_ready || !_take()) return 0; size_t n = LittleFS.totalBytes(); _give(); return n;
+}
+
+const char* PhotoStore::storageStateName() const {
+    if (!_ready) return "unavailable";
+    if (_degraded) return "degraded";
+    return "ready";
 }
 
 const char* PhotoStore::uploadErrorName(PhotoUploadError error) {

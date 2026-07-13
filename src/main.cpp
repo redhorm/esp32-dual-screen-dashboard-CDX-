@@ -19,8 +19,11 @@
 #include "core/race.h"
 #include "core/ui_settings.h"
 #include "core/experience.h"
+#include "core/rtl_logic.h"
 #include "app/scene_dashboard.h"
 #include "app/scene_navigator.h"
+#include "hal/ws2812_rtl.h"
+#include "hal/esc_pwm_input.h"
 #include "services/config_portal.h"
 
 static LGFX_DisplayA   dispA;
@@ -29,9 +32,13 @@ static Simulator       sim;
 static Roadbook        roadbook;
 static RaceController  race;
 static ExperienceEngine experience;
+static RtlLogic        rtl(RtlProfile::ULTRA4_4400, RTL_LED_COUNT,
+                           RTL_COMMAND_TIMEOUT_MS);
+static Ws2812Rtl       rtlHardware;
+static EscPwmInput     escPwm;
 static SceneDashboard  dash(dispA);
 static SceneNavigator  nav(dispB, roadbook);
-static ConfigPortal    portal(experience);
+static ConfigPortal    portal(experience, rtl, rtlHardware, escPwm);
 
 // ── Shared frame (written by core 1, read by the nav task) ──────────────────
 struct SharedFrame {
@@ -40,6 +47,7 @@ struct SharedFrame {
     RunStats     stats;
     UiSettings   settings;
     ExperienceFrame experience;
+    bool portal_credentials_visible = true;
 };
 static SharedFrame  shared;
 static portMUX_TYPE shareMux = portMUX_INITIALIZER_UNLOCKED;
@@ -77,6 +85,8 @@ static void navTask(void*) {
         uint32_t t0 = micros();
         nav.setSettings(f.settings);
         nav.setExperienceFrame(f.experience);
+        nav.setPortalCredentials(f.portal_credentials_visible,
+                                 portal.ssidString(), portal.passwordString());
         nav.render(f.s, f.fx, f.stats);
         uint32_t t1 = micros();
         nav.push();
@@ -107,7 +117,8 @@ void setup() {
 
     bool ap_ok = portal.begin();
     Serial.printf("[portal] AP %s | SSID=%s | http://%s\n",
-                  ap_ok ? "ready" : "failed", CONFIG_AP_SSID, portal.ipString());
+                  ap_ok ? "ready" : "failed", portal.ssidString(),
+                  portal.ipString());
 
     dispA.init();
     dispB.init();
@@ -117,11 +128,13 @@ void setup() {
 
     dash.init();
     nav.init();
+    pinMode(CONFIG_AP_REVEAL_PIN, INPUT_PULLUP);
     sim.reset();
     roadbook.reset();
     race.reset(millis());
     experience.reset(millis());
     shared.settings = settings;
+    shared.portal_credentials_visible = true;
 
     xTaskCreatePinnedToCore(navTask, "nav", 8192, nullptr, 1, nullptr, 0);
 }
@@ -146,6 +159,8 @@ void loop() {
     race.update(now, sim, roadbook);
     experience.update(now, sim.state, race.fx());
     const ExperienceFrame experience_frame = experience.frame(now);
+    const bool show_portal_credentials = !portal.setupComplete() ||
+        digitalRead(CONFIG_AP_REVEAL_PIN) == LOW;
 
     taskENTER_CRITICAL(&shareMux);
     shared.s     = sim.state;
@@ -153,11 +168,14 @@ void loop() {
     shared.stats = race.stats();
     shared.settings = settings;
     shared.experience = experience_frame;
+    shared.portal_credentials_visible = show_portal_credentials;
     taskEXIT_CRITICAL(&shareMux);
 
     uint32_t t0 = micros();
     dash.setSettings(settings);
     dash.setExperienceFrame(experience_frame);
+    dash.setPortalCredentials(show_portal_credentials, portal.ssidString(),
+                              portal.passwordString());
     dash.render(sim.state, race.fx(), race.stats());
     uint32_t t1 = micros();
     dash.push();

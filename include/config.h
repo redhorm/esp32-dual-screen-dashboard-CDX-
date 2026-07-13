@@ -24,6 +24,31 @@
 #define DISP_B_RST    17   // Reset  (or -1)
 #define DISP_B_BL     18   // Backlight; set -1 to tie BL → 3.3 V
 
+// REAR LIGHT  WS2812/NeoPixel — separate regulated 5 V supply required.
+// GPIO is data only; never power the strip from an ESP32 pin.
+#define RTL_WS2812_PIN          4
+#define RTL_LED_COUNT          16
+#define RTL_LED_BRIGHTNESS     96
+#define RTL_COMMAND_TIMEOUT_MS 1500UL
+
+// FUTURE ESC receiver signal capture.  Disabled until conditioned hardware is
+// installed; a vehicle/receiver signal above 3.6 V must not reach the ESP32.
+#define ESC_PWM_SIGNAL_PIN      5
+#define ESC_PWM_INPUT_ENABLED   0
+#define ESC_PWM_MIN_US        800U
+#define ESC_PWM_MAX_US       2200U
+#define ESC_PWM_TIMEOUT_US 100000UL
+#define ESC_PWM_REVERSE_US    1000U
+#define ESC_PWM_NEUTRAL_US    1500U
+#define ESC_PWM_FORWARD_US    2000U
+#define ESC_PWM_ENTER         0.12f
+#define ESC_PWM_EXIT          0.06f
+#define ESC_PWM_SMOOTH_MS       55U
+#define ESC_PWM_MAX_SLEW         8.0f
+#define ESC_NEUTRAL_DWELL_MS   180U
+#define ESC_REVERSE_CONFIRM_MS 220U
+#define ESC_REVERSE_ARM_MS    1600U
+
 // ----------------------------------------------------------------
 // ST7735  160×80  offset / inversion tuning
 // Most 160×80 IPS blue-PCB modules: col=26 row=1 invert=false BGR
@@ -66,10 +91,10 @@
 // Connect to this network and open http://192.168.4.1.  The captive
 // DNS also redirects common portal probes to the settings page.
 // ----------------------------------------------------------------
-#define CONFIG_AP_SSID        "ULTRA4-DASH"
-#define CONFIG_AP_PASSWORD    "ultra4setup"  // min 8 characters
-#define CONFIG_AP_CHANNEL      6
-#define CONFIG_AP_MAX_CLIENTS  2
+#define CONFIG_AP_SSID_PREFIX          "ULTRA4-DASH"
+#define CONFIG_AP_CHANNEL               6
+#define CONFIG_AP_MAX_CLIENTS           2
+#define CONFIG_AP_REVEAL_PIN             0  // Hold BOOT while running to reveal
 
 // ----------------------------------------------------------------
 // Simulator limits

@@ -5,6 +5,7 @@
 #include "scene_navigator.h"
 #include "core/formatter.h"
 #include "core/anim.h"
+#include "core/ui_i18n.h"
 #include "config.h"
 
 // ── Palette (RGB565) — WAY MAP style ─────────────────────────────────────────
@@ -62,6 +63,67 @@ void SceneNavigator::push() {
     _spr.pushSprite(&_disp, 0, 0);
 }
 
+void SceneNavigator::setPortalCredentials(bool visible, const char* ssid,
+                                          const char* password) {
+    // Suppress the overlay while replacing bounded, NUL-terminated copies.
+    _portalCredentialsVisible = false;
+    snprintf(_portalSsid, sizeof(_portalSsid), "%s", ssid ? ssid : "");
+    snprintf(_portalPassword, sizeof(_portalPassword), "%s",
+             password ? password : "");
+    _portalCredentialsVisible = visible;
+}
+
+void SceneNavigator::_renderPortalCredentials() {
+    constexpr uint16_t BG       = 0x1082;  // warm graphite
+    constexpr uint16_t PANEL    = 0x2104;
+    constexpr uint16_t ORANGE   = 0xFC40;
+    constexpr uint16_t SAND     = 0xE6F3;
+    constexpr uint16_t DIM      = 0x9CD3;
+    constexpr uint16_t DARK_INK = 0x1082;
+
+    _spr.fillScreen(BG);
+    _spr.fillRect(0, 0, W, 36, ORANGE);
+    _spr.drawRect(3, 3, W - 6, H - 6, ORANGE);
+
+    // Code-native radio arcs: recognizable even before any text is read.
+    _spr.drawCircle(W / 2, 69, 24, ORANGE);
+    _spr.fillRect(W / 2 - 26, 69, 52, 28, BG);
+    _spr.drawCircle(W / 2, 69, 15, ORANGE);
+    _spr.fillRect(W / 2 - 17, 69, 34, 19, BG);
+    _spr.fillCircle(W / 2, 69, 4, ORANGE);
+
+    _spr.setTextSize(1);
+    _spr.setTextDatum(lgfx::MC_DATUM);
+    _spr.setFont(&lgfx::fonts::Font4);
+    _spr.setTextColor(DARK_INK, ORANGE);
+    _spr.drawString(uiText(_settings.language, "ABBINA IL MEZZO",
+                           "PAIR THIS RIG"), W / 2, 18);
+
+    _spr.fillRoundRect(12, 96, W - 24, 45, 5, PANEL);
+    _spr.fillRoundRect(12, 147, W - 24, 45, 5, PANEL);
+    _spr.setFont(&lgfx::fonts::Font0);
+    _spr.setTextDatum(lgfx::TC_DATUM);
+    _spr.setTextColor(DIM, PANEL);
+    _spr.drawString("SSID", W / 2, 101);
+    _spr.drawString("PASSWORD", W / 2, 152);
+    _spr.setTextColor(SAND, PANEL);
+    _spr.setFont(&lgfx::fonts::Font2);
+    if (_spr.textWidth(_portalSsid) > W - 36)
+        _spr.setFont(&lgfx::fonts::Font0);
+    _spr.drawString(_portalSsid, W / 2, 116);
+    _spr.setFont(&lgfx::fonts::Font2);
+    if (_spr.textWidth(_portalPassword) > W - 36)
+        _spr.setFont(&lgfx::fonts::Font0);
+    _spr.drawString(_portalPassword, W / 2, 167);
+
+    _spr.fillRoundRect(30, 205, W - 60, 25, 4, ORANGE);
+    _spr.setFont(&lgfx::fonts::Font2);
+    _spr.setTextDatum(lgfx::MC_DATUM);
+    _spr.setTextColor(DARK_INK, ORANGE);
+    _spr.drawString("192.168.4.1", W / 2, 217);
+    _spr.setTextDatum(lgfx::TL_DATUM);
+}
+
 // ── Anti-aliased helpers ─────────────────────────────────────────────────────
 
 void SceneNavigator::_aaLine(int x0, int y0, int x1, int y1, uint16_t color) {
@@ -96,10 +158,8 @@ void SceneNavigator::_aaTri(int x0, int y0, int x1, int y1, int x2, int y2,
 // ── Direction arrows (pure primitives, AA, drawn on white cell) ─────────────
 
 void SceneNavigator::_drawArrow(int cx, int cy, const Waypoint& wp) {
-    const uint16_t ink = _settings.navigator_theme == UiTheme::NIGHT_OPS ? 0x67BF
-                       : _settings.navigator_theme == UiTheme::BAJA_AMBER ? 0x28E2
-                       : _settings.navigator_theme == UiTheme::TRAIL_TOPO ? 0x2223
-                       : C_BLACK;
+    // Classic Rally and the REALISM information card both use black route ink.
+    const uint16_t ink = C_BLACK;
     uint16_t dot = wp.danger                        ? C_RED
                  : wp.kind == NoteKind::INFO_BLUE   ? C_BLUE
                  : wp.kind == NoteKind::GOOD        ? C_GREENT
@@ -203,7 +263,8 @@ void SceneNavigator::_drawHeader(const UiFx& fx) {
 
     _spr.setFont(&lgfx::fonts::Font2);
     _spr.setTextDatum(lgfx::TC_DATUM);
-    _spr.drawString("WAY MAP", W / 2, 3);
+    _spr.drawString(uiText(_settings.language, "MAPPA", "WAY MAP"),
+                    W / 2, 3);
 
     char clk[10];
     Fmt::clockHMS(clk, fx.now_ms / 1000);
@@ -251,15 +312,17 @@ void SceneNavigator::_drawRow(int y, const Waypoint& wp, bool active,
                       : wp.kind == NoteKind::GOOD      ? C_GREENT
                       : wp.kind == NoteKind::INFO_BLUE ? C_BLUE
                       :                                  C_BLACK;
-    bool has_note   = wp.note && wp.note[0];
-    bool short_info = strlen(wp.info) <= 7;
+    const char* info = localizedRoadbookText(_settings.language, wp.info);
+    const char* note = localizedRoadbookText(_settings.language, wp.note);
+    bool has_note   = note && note[0];
+    bool short_info = strlen(info) <= 7;
     _spr.setFont(short_info ? &_fonts.med : &_fonts.small);
     _spr.setTextColor(C_BLACK);
-    _spr.drawString(wp.info, CX_INFO, has_note ? y + 13 : cy);
+    _spr.drawString(info, CX_INFO, has_note ? y + 13 : cy);
     if (has_note) {
         _spr.setFont(&_fonts.small);
         _spr.setTextColor(note_col);
-        _spr.drawString(wp.note, CX_INFO, y + 29);
+        _spr.drawString(note, CX_INFO, y + 29);
     }
 
     // TOTAL — cumulative distance
@@ -279,9 +342,11 @@ void SceneNavigator::_drawTable(const VehicleState& s, const UiFx& fx) {
     char hd[10];
     snprintf(hd, sizeof(hd), "DIST %s", _settings.use_kmh ? "KM" : "MI");
     _spr.drawString(hd,     CX_DIST, THDR_Y + 3);
-    _spr.drawString("DIR",  CX_ARR,  THDR_Y + 3);
+    _spr.drawString(uiText(_settings.language, "DIR", "DIR"),
+                    CX_ARR, THDR_Y + 3);
     _spr.drawString("INFO", CX_INFO, THDR_Y + 3);
-    _spr.drawString("TOT",  CX_TOT,  THDR_Y + 3);
+    _spr.drawString(uiText(_settings.language, "TOT", "TOT"),
+                    CX_TOT, THDR_Y + 3);
     _spr.setTextDatum(lgfx::TL_DATUM);
 
     // Scrolling window: active row second from top; changes SLIDE
@@ -320,7 +385,8 @@ void SceneNavigator::_drawSideColumn(const VehicleState& s, const UiFx& fx) {
     _spr.setFont(&lgfx::fonts::Font0);
     _spr.setTextSize(1);
     _spr.setTextColor(C_LGRAY, C_BG);
-    _spr.drawString("SPEED", SIDE_CX, 27);
+    _spr.drawString(uiText(_settings.language, "VELOCITA", "SPEED"),
+                    SIDE_CX, 27);
     Fmt::speed(buf, spd, _settings.use_kmh);
     _spr.setFont(&_fonts.speed);
     _spr.setTextColor(C_WHITE);
@@ -331,7 +397,8 @@ void SceneNavigator::_drawSideColumn(const VehicleState& s, const UiFx& fx) {
 
     _spr.drawFastHLine(SIDE_X + 4, 92, W - SIDE_X - 8, C_GRAY);
 
-    _spr.drawString("GEAR", SIDE_CX, 96);
+    _spr.drawString(uiText(_settings.language, "MARCIA", "GEAR"),
+                    SIDE_CX, 96);
     Fmt::gear(buf, s.gear, false);   // navigator shows the actual gear number
     _spr.setFont(&_fonts.speed);
     _spr.setTextColor(C_YELLOW);
@@ -362,7 +429,7 @@ void SceneNavigator::_drawFooter(const VehicleState& s, const UiFx& fx) {
     _spr.drawFastHLine(0, FOOT_Y + 1, W, bar);
 
     char buf[14];
-    Fmt::headingFull(buf, s.heading_deg);
+    localizedHeadingFull(_settings.language, buf, s.heading_deg);
     _spr.setFont(&_fonts.med);
     _spr.setTextSize(1);
     _spr.setTextColor(C_WHITE);
@@ -408,7 +475,9 @@ void SceneNavigator::_renderBoot(const UiFx& fx) {
 
         char msg[20];
         int dots = (int)((t / 350) % 4);
-        snprintf(msg, sizeof(msg), "GPS ACQUIRING%.*s", dots, "...");
+        snprintf(msg, sizeof(msg), "%s%.*s",
+                 uiText(_settings.language, "RICERCA GPS", "GPS ACQUIRING"),
+                 dots, "...");
         _spr.setFont(&_fonts.med);
         _spr.setTextSize(1);
         _spr.setTextColor(C_WHITE);
@@ -433,7 +502,8 @@ void SceneNavigator::_renderBoot(const UiFx& fx) {
         _spr.setFont(&lgfx::fonts::Font0);
         _spr.setTextColor(C_LGRAY, C_BG);
         _spr.setTextDatum(lgfx::TC_DATUM);
-        _spr.drawString("SATELLITES", W / 2, 176);
+        _spr.drawString(uiText(_settings.language, "SATELLITI", "SATELLITES"),
+                        W / 2, 176);
         _spr.setTextDatum(lgfx::TL_DATUM);
 
     } else {
@@ -443,10 +513,12 @@ void SceneNavigator::_renderBoot(const UiFx& fx) {
         _spr.setTextSize(1);
         _spr.setTextColor(C_WHITE);
         _spr.setTextDatum(lgfx::MC_DATUM);
-        _spr.drawString("SAT LOCK", W / 2, 104);
+        _spr.drawString(uiText(_settings.language, "GPS AGGANCIATO", "SAT LOCK"),
+                        W / 2, 104);
         _spr.setFont(&_fonts.med);
         _spr.setTextColor(C_GREENB);
-        _spr.drawString("WAY MAP READY", W / 2, 146);
+        _spr.drawString(uiText(_settings.language, "MAPPA PRONTA",
+                               "WAY MAP READY"), W / 2, 146);
         _spr.setTextDatum(lgfx::TL_DATUM);
     }
 }
@@ -473,12 +545,14 @@ void SceneNavigator::_renderFinish(const UiFx& fx, const RunStats& stats) {
     _spr.setTextSize(1);
     _spr.setTextColor(C_WHITE);
     _spr.setTextDatum(lgfx::MC_DATUM);
-    _spr.drawString("FINISH", W / 2, 70);
+    _spr.drawString(uiText(_settings.language, "ARRIVO", "FINISH"),
+                    W / 2, 70);
 
     _spr.setFont(&lgfx::fonts::Font0);
     _spr.setTextColor(C_LGRAY, C_BG);
     _spr.setTextDatum(lgfx::TC_DATUM);
-    _spr.drawString("STAGE TIME", W / 2, 100);
+    _spr.drawString(uiText(_settings.language, "TEMPO PROVA", "STAGE TIME"),
+                    W / 2, 100);
 
     char buf[16];
     Fmt::raceTime(buf, stats.stage_ms);
@@ -506,6 +580,10 @@ void SceneNavigator::_renderFinish(const UiFx& fx, const RunStats& stats) {
 
 void SceneNavigator::render(const VehicleState& s, const UiFx& fx,
                             const RunStats& stats) {
+    if (_portalCredentialsVisible) {
+        _renderPortalCredentials();
+        return;
+    }
     if (_renderExperienceTakeover(fx)) return;
     if (fx.phase == Phase::BOOT && _settings.boot_image_enabled &&
         fx.phase_ms < _settings.boot_hold_ms && photoStore.hasBoot(true)) {
@@ -518,7 +596,16 @@ void SceneNavigator::render(const VehicleState& s, const UiFx& fx,
         photoStore.drawFrame(_spr, true, _photoFrame, _settings, fx.now_ms))
         return;
 
-    if (_settings.navigator_theme != UiTheme::CLASSIC_RALLY) {
+    if (_settings.navigator_theme == UiTheme::STOCK_OFFROAD) {
+        switch (fx.phase) {
+            case Phase::BOOT:   _renderStockBoot(fx);          break;
+            case Phase::LIVE:   _renderStockLive(s, fx);       break;
+            case Phase::FINISH: _renderStockFinish(fx, stats); break;
+        }
+        return;
+    }
+
+    if (_settings.navigator_theme == UiTheme::REALISM) {
         switch (fx.phase) {
             case Phase::BOOT:   _renderThemedBoot(fx);          break;
             case Phase::LIVE:   _renderThemedLive(s, fx);       break;

@@ -5,6 +5,7 @@
 #include "core/state.h"
 #include "core/race.h"
 #include "core/easing.h"
+#include "core/shift_light.h"
 #include "core/ui_settings.h"
 #include "core/experience.h"
 #include "services/photo_store.h"
@@ -19,6 +20,8 @@ public:
     void init();
     void setSettings(const UiSettings& settings) { _settings = settings; }
     void setExperienceFrame(const ExperienceFrame& frame) { _experience = frame; }
+    void setPortalCredentials(bool visible, const char* ssid,
+                              const char* password);
     void render(const VehicleState& s, const UiFx& fx, const RunStats& stats);
     void push();
 
@@ -29,9 +32,13 @@ private:
     ExperienceFrame     _experience;
     PhotoFrameState     _photoFrame;
     bool                _bootPhotoLoaded = false;
+    bool                _portalCredentialsVisible = false;
+    char                _portalSsid[24] = "";
+    char                _portalPassword[16] = "";
 
     Follow _rpmF;    // RPM bar smoothing, VU-meter attack/release
     Follow _speedF;  // speed readout smoothing
+    ShiftLightController _shiftLights;  // stable IQ3S upper LED quantizer
 
     // Phase screens
     void _renderBoot(const VehicleState& s, const UiFx& fx);
@@ -43,7 +50,12 @@ private:
     void _renderThemedLive(const VehicleState& s, const UiFx& fx,
                            const RunStats& stats);
     void _renderThemedFinish(const UiFx& fx, const RunStats& stats);
+    void _renderStockBoot(const VehicleState& s, const UiFx& fx);
+    void _renderStockLive(const VehicleState& s, const UiFx& fx,
+                          const RunStats& stats);
+    void _renderStockFinish(const UiFx& fx, const RunStats& stats);
     bool _renderExperienceTakeover(const UiFx& fx);
+    void _renderPortalCredentials();
 
     // Layout building blocks (all coordinates in Lay:: constants)
     void _drawFrame();

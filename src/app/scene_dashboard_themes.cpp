@@ -1,149 +1,388 @@
 #ifndef NATIVE_BUILD
 #include <stdio.h>
+#include <math.h>
 #include "scene_dashboard.h"
 #include "core/formatter.h"
 #include "core/anim.h"
+#include "core/ui_i18n.h"
 #include "config.h"
 
+// REALISM / driver display
+// A code-native, 160x80 interpretation of the Racepak IQ3S: dark moulded
+// housing, cyan LCD, 1-9 tach scale, ten external shift lamps and compact
+// race telemetry.  The Classic Rally renderer remains in scene_dashboard.cpp.
 namespace {
 constexpr uint16_t rgb(uint8_t r, uint8_t g, uint8_t b) {
     return ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3);
 }
-struct Colors { uint16_t bg, panel, ink, dim, accent, danger, good, line; };
-constexpr Colors BAJA = { rgb(16,10,5), rgb(48,29,12), rgb(255,229,184), rgb(184,116,45), rgb(255,154,20), rgb(242,55,38), rgb(170,210,65), rgb(119,72,25) };
-constexpr Colors NIGHT= { rgb(1,7,10), rgb(5,24,30), rgb(96,243,255), rgb(42,104,116), rgb(198,255,44), rgb(255,55,62), rgb(54,224,164), rgb(15,105,117) };
-constexpr Colors TOPO = { rgb(31,37,23), rgb(225,205,151), rgb(25,34,19), rgb(123,135,83), rgb(226,169,53), rgb(194,66,42), rgb(104,145,63), rgb(137,146,91) };
-const Colors& palette(UiTheme t) {
-    return t == UiTheme::NIGHT_OPS ? NIGHT : (t == UiTheme::TRAIL_TOPO ? TOPO : BAJA);
+
+constexpr uint16_t BEZEL      = rgb(18, 21, 22);
+constexpr uint16_t BEZEL_HI   = rgb(83, 89, 90);
+constexpr uint16_t BEZEL_LO   = rgb(4, 5, 5);
+constexpr uint16_t LCD        = rgb(83, 199, 219);
+constexpr uint16_t LCD_HI     = rgb(137, 226, 238);
+constexpr uint16_t LCD_INK    = rgb(2, 25, 31);
+constexpr uint16_t LCD_DIM    = rgb(27, 111, 126);
+constexpr uint16_t LED_OFF    = rgb(35, 38, 36);
+constexpr uint16_t LED_GREEN  = rgb(44, 255, 79);
+constexpr uint16_t LED_YELLOW = rgb(255, 216, 25);
+constexpr uint16_t LED_RED    = rgb(255, 34, 20);
+constexpr uint16_t LED_EDGE   = rgb(112, 118, 113);
+
+void drawHousing(LGFX_Sprite& spr) {
+    spr.fillScreen(BEZEL_LO);
+    spr.fillRoundRect(0, 0, 160, 80, 7, BEZEL);
+    spr.drawRoundRect(0, 0, 160, 80, 7, BEZEL_HI);
+    spr.drawFastHLine(6, 1, 148, rgb(112, 117, 117));
+    spr.fillRoundRect(2, 12, 156, 66, 3, BEZEL_LO);
+    spr.fillRect(4, 14, 152, 62, LCD);
+    spr.drawRect(4, 14, 152, 62, LCD_HI);
+}
+
+void drawShiftLamps(LGFX_Sprite& spr, int stable_lit, bool warning,
+                    uint32_t now_ms, int forced_lit = -1) {
+    int lit = forced_lit >= 0 ? forced_lit : stable_lit;
+    if (lit < 0) lit = 0;
+    if (lit > 10) lit = 10;
+    bool flash = warning && Anim::pulse(now_ms, SHIFT_FLASH_MS);
+
+    // Four warning lamps flank the progressive strip, as on the IQ3S face.
+    constexpr int warn_x[4] = {5, 13, 147, 155};
+    for (int i = 0; i < 4; ++i) {
+        bool on = warning && (i == 0 || i == 3 || flash);
+        spr.fillSmoothCircle(warn_x[i], 6, 2, on ? LED_RED : LED_OFF);
+        spr.drawCircle(warn_x[i], 6, 2, LED_EDGE);
+    }
+
+    for (int i = 0; i < 10; ++i) {
+        uint16_t active = i < 5 ? LED_GREEN : (i < 8 ? LED_YELLOW : LED_RED);
+        // The progressive strip is intentionally steady.  Warning animation
+        // belongs to the four dedicated lamps above, never to the RPM level.
+        uint16_t color = i < lit ? active : LED_OFF;
+        int x = 21 + i * 12;
+        spr.fillRoundRect(x, 3, 9, 7, 2, color);
+        spr.drawRoundRect(x, 3, 9, 7, 2, LED_EDGE);
+        if (color != LED_OFF) spr.drawFastHLine(x + 2, 4, 5, 0xFFFF);
+    }
+}
+
+void drawTachScale(LGFX_Sprite& spr, float rpm) {
+    spr.setTextDatum(lgfx::TC_DATUM);
+    spr.setFont(&lgfx::fonts::Font0);
+    spr.setTextColor(LCD_INK, LCD);
+    for (int i = 1; i <= 9; ++i) {
+        int x = 10 + (i - 1) * 15;
+        int d = i > 5 ? i - 5 : 5 - i;
+        char n[2] = { static_cast<char>('0' + i), 0 };
+        spr.drawString(n, x, 14 + d);
+    }
+    spr.setTextDatum(lgfx::TR_DATUM);
+    spr.drawString("RPM", 153, 15);
+
+    float p = rpm / 9000.0f;
+    if (p < 0.0f) p = 0.0f;
+    if (p > 1.0f) p = 1.0f;
+    int lit = static_cast<int>(p * 29.0f + 0.5f);
+    int last_x = 6;
+    int last_y = 29;
+    for (int i = 0; i < 29; ++i) {
+        int x = 6 + i * 5;
+        int dx = x - 76;
+        int y = 24 + (dx * dx) / 980;
+        uint16_t col = i < lit ? LCD_INK : LCD_DIM;
+        if (i) spr.drawWideLine(last_x, last_y, x, y, 0.7f, col);
+        spr.fillRect(x, y - 1, 3, 3, col);
+        last_x = x;
+        last_y = y;
+    }
+    spr.setTextDatum(lgfx::TL_DATUM);
 }
 }
 
 void SceneDashboard::_renderThemedBoot(const VehicleState&, const UiFx& fx) {
-    const auto& c = palette(_settings.driver_theme);
-    _spr.fillScreen(c.bg);
-    _spr.drawRoundRect(1, 1, 158, 78, 5, c.line);
+    drawHousing(_spr);
     float q = Ease::outCubic(Anim::progress(fx.phase_ms, 0, BOOT_LOGO_MS));
-    for (int i = 0; i < 5; i++)
-        _spr.drawRoundRect(28-i*3, 19-i*2, 104+i*6, 39+i*4, 5, c.line);
-    const char* title = _settings.driver_theme == UiTheme::BAJA_AMBER ? "BAJA" :
-                        _settings.driver_theme == UiTheme::NIGHT_OPS ? "OPS" : "TRAIL";
+    drawShiftLamps(_spr, 0, false, fx.now_ms,
+                   static_cast<int>(q * 10.0f + 0.5f));
+
     _spr.setTextDatum(lgfx::MC_DATUM);
     _spr.setFont(&lgfx::fonts::Font4);
-    _spr.setTextColor(Anim::lerp565(c.bg, c.accent, q));
-    _spr.drawString(title, 80, 33);
+    _spr.setTextColor(Anim::lerp565(LCD, LCD_INK, q), LCD);
+    _spr.drawString("RACEPAK", 80, 35);
+    _spr.setFont(&lgfx::fonts::Font2);
+    _spr.setTextColor(LCD_INK, LCD);
+    _spr.drawString("IQ3S", 80, 57);
     _spr.setFont(&lgfx::fonts::Font0);
-    _spr.setTextColor(c.ink);
-    _spr.drawString("ULTRA4 // SYSTEM CHECK", 80, 58);
+    _spr.setTextColor(LCD_DIM, LCD);
+    _spr.drawString(uiText(_settings.language, "LOGGER / CONTROLLO",
+                           "LOGGER / SYSTEM CHECK"), 80, 70);
     _spr.setTextDatum(lgfx::TL_DATUM);
 }
 
 void SceneDashboard::_renderThemedLive(const VehicleState& s, const UiFx& fx,
                                        const RunStats&) {
-    const auto& c = palette(_settings.driver_theme);
+    drawHousing(_spr);
     float rpm = _rpmF.update(s.rpm, fx.now_ms, RPM_ATTACK_MS, RPM_RELEASE_MS);
     float speed = _speedF.update(s.speed_mph, fx.now_ms,
                                  SPEED_SMOOTH_MS, SPEED_SMOOTH_MS);
-    bool limiter = fx.redline && Anim::pulse(fx.now_ms, SHIFT_FLASH_MS);
+    bool warning = fx.redline || fx.alert || s.engine_temp_f >= 235.0f ||
+                   s.battery_v <= 11.2f;
+    const int stable_lit = _shiftLights.update(rpm, fx.now_ms);
+    drawShiftLamps(_spr, stable_lit, warning, fx.now_ms);
+    drawTachScale(_spr, rpm);
+
     char buf[18];
-    _spr.fillScreen(c.bg);
+    // Main IQ3S readouts: speed left, large gear in the centre, fuel right.
+    _spr.setTextDatum(lgfx::TC_DATUM);
+    _spr.setFont(&lgfx::fonts::Font0);
+    _spr.setTextColor(LCD_DIM, LCD);
+    _spr.drawString(_settings.use_kmh ? "KM/H" : "MPH", 31, 32);
+    _spr.drawString(uiText(_settings.language, "MARCIA", "GEAR"), 80, 32);
+    _spr.drawString(uiText(_settings.language, "CARB", "FUEL"), 130, 32);
 
-    if (_settings.driver_theme == UiTheme::BAJA_AMBER) {
-        // Chunky desert tach and back-lit switch panel.
-        _spr.drawRoundRect(1,1,158,78,4,limiter?c.danger:c.line);
-        int lit=(int)(rpm/SIM_MAX_RPM*19);
-        for(int i=0;i<19;i++){
-            int h=4+(i%3==1?2:0);
-            _spr.fillRect(4+i*8,4,6,h,i<lit?(i>16?c.danger:c.accent):c.panel);
-        }
-        _spr.setFont(&lgfx::fonts::Font0); _spr.setTextColor(c.dim);
-        _spr.drawString("BAJA // STAGE",5,13);
-        Fmt::speed(buf,speed,_settings.use_kmh);
-        _spr.setFont(&lgfx::fonts::Font4); _spr.setTextColor(c.ink);
-        _spr.drawString(buf,5,24);
-        _spr.setFont(&lgfx::fonts::Font0); _spr.setTextColor(c.accent);
-        _spr.drawString(_settings.use_kmh?"KMH":"MPH",7,49);
-        _spr.fillRoundRect(109,17,45,38,5,c.panel);
-        _spr.drawRoundRect(109,17,45,38,5,c.accent);
-        Fmt::gear(buf,s.gear,false);
-        _spr.setFont(&lgfx::fonts::Font4); _spr.setTextDatum(lgfx::MC_DATUM);
-        _spr.setTextColor(c.accent); _spr.drawString(buf,131,36);
-        _spr.setTextDatum(lgfx::TL_DATUM);
-        snprintf(buf,sizeof(buf),"%d RPM",(int)s.rpm);
-        _spr.setFont(&lgfx::fonts::Font0); _spr.setTextColor(c.ink);
-        _spr.drawString(buf,59,47);
-    } else if (_settings.driver_theme == UiTheme::NIGHT_OPS) {
-        // NVG scan grid, central hero speed and a cyan RPM rail.
-        for(int x=0;x<160;x+=10)_spr.drawFastVLine(x,0,80,c.panel);
-        for(int y=0;y<80;y+=10)_spr.drawFastHLine(0,y,160,c.panel);
-        _spr.drawRect(1,1,158,78,limiter?c.danger:c.line);
-        _spr.setFont(&lgfx::fonts::Font0); _spr.setTextColor(c.good);
-        _spr.drawString("NIGHT OPS / LIVE",5,5);
-        Fmt::speed(buf,speed,_settings.use_kmh);
-        _spr.setFont(&lgfx::fonts::Font4); _spr.setTextColor(c.ink);
-        _spr.setTextDatum(lgfx::MC_DATUM); _spr.drawString(buf,70,34);
-        _spr.setFont(&lgfx::fonts::Font0); _spr.setTextColor(c.dim);
-        _spr.drawString(_settings.use_kmh?"KM/H":"MPH",70,52);
-        _spr.fillRoundRect(124,17,30,36,3,c.panel);
-        Fmt::gear(buf,s.gear,false);
-        _spr.setFont(&lgfx::fonts::Font4); _spr.setTextColor(c.accent);
-        _spr.drawString(buf,139,34); _spr.setTextDatum(lgfx::TL_DATUM);
-        int lit=(int)(rpm/SIM_MAX_RPM*24);
-        for(int i=0;i<24;i++)
-            _spr.fillRect(5+i*6,59,4,5,i<lit?(i>20?c.danger:c.ink):c.panel);
-    } else {
-        // Expedition panel: compass ribbon, sand cards and topo accents.
-        _spr.drawRoundRect(1,1,158,78,5,c.line);
-        _spr.fillRect(3,3,154,14,c.panel);
-        char heading[12]; Fmt::headingFull(heading,s.heading_deg);
-        _spr.setFont(&lgfx::fonts::Font0); _spr.setTextColor(c.ink,c.panel);
-        _spr.setTextDatum(lgfx::MC_DATUM); _spr.drawString(heading,80,10);
-        for(int x=8;x<153;x+=12)_spr.drawFastVLine(x,4,3,c.dim);
-        _spr.fillTriangle(77,16,83,16,80,12,c.danger);
-        _spr.fillRoundRect(5,21,91,35,5,c.panel);
-        Fmt::speed(buf,speed,_settings.use_kmh);
-        _spr.setFont(&lgfx::fonts::Font4); _spr.drawString(buf,43,36);
-        _spr.setFont(&lgfx::fonts::Font0);
-        _spr.drawString(_settings.use_kmh?"KMH":"MPH",80,38);
-        _spr.fillRoundRect(104,21,50,35,5,c.panel);
-        Fmt::gear(buf,s.gear,false);
-        _spr.setFont(&lgfx::fonts::Font4); _spr.setTextColor(c.danger);
-        _spr.drawString(buf,129,36); _spr.setTextDatum(lgfx::TL_DATUM);
-        snprintf(buf,sizeof(buf),"ODO %.1f",s.odo_mi);
-        _spr.setFont(&lgfx::fonts::Font0); _spr.setTextColor(c.accent);
-        _spr.drawString(buf,6,59);
-        snprintf(buf,sizeof(buf),"%d RPM",(int)s.rpm); _spr.drawString(buf,102,59);
-    }
+    Fmt::speed(buf, speed, _settings.use_kmh);
+    _spr.setFont(&lgfx::fonts::Font4);
+    _spr.setTextColor(LCD_INK, LCD);
+    _spr.drawString(buf, 31, 39);
+    Fmt::gear(buf, s.gear, false);
+    _spr.drawString(buf, 80, 39);
 
-    float mt=_settings.use_celsius?(s.engine_temp_f-32)*5/9:s.engine_temp_f;
-    float et=_settings.use_celsius?(s.esc_temp_f-32)*5/9:s.esc_temp_f;
-    _spr.fillRect(3,68,154,9,c.panel);
-    _spr.setFont(&lgfx::fonts::Font0); _spr.setTextColor(c.ink,c.panel);
-    snprintf(buf,sizeof(buf),"M%d%c",(int)mt,_settings.use_celsius?'C':'F'); _spr.drawString(buf,6,69);
-    snprintf(buf,sizeof(buf),"E%d%c",(int)et,_settings.use_celsius?'C':'F'); _spr.drawString(buf,57,69);
-    snprintf(buf,sizeof(buf),"%.1fV",s.battery_v); _spr.drawString(buf,120,69);
+    int fuel = static_cast<int>(s.fuel_pct * 100.0f + 0.5f);
+    if (fuel < 0) fuel = 0;
+    if (fuel > 100) fuel = 100;
+    snprintf(buf, sizeof(buf), "%d%%", fuel);
+    _spr.setFont(&lgfx::fonts::Font2);
+    _spr.drawString(buf, 130, 42);
+    for (int i = 0; i < 5; ++i)
+        _spr.fillRect(112 + i * 8, 57, 6, 3,
+                      i * 20 < fuel ? LCD_INK : LCD_DIM);
 
-    if(fx.alert){
-        uint16_t a=Anim::pulse(fx.now_ms,ALERT_PULSE_MS)?c.danger:c.panel;
-        _spr.fillRect(2,57,156,21,a);
-        snprintf(buf,sizeof(buf),"%s %s",fx.alert_info,fx.alert_note);
-        _spr.setFont(&lgfx::fonts::Font2); _spr.setTextDatum(lgfx::MC_DATUM);
-        _spr.setTextColor(c.ink); _spr.drawString(buf,80,67);
+    // Lower four-channel telemetry ribbon, intentionally dense like the real LCD.
+    _spr.drawFastHLine(6, 62, 148, LCD_DIM);
+    _spr.setFont(&lgfx::fonts::Font0);
+    _spr.setTextDatum(lgfx::TL_DATUM);
+    _spr.setTextColor(LCD_INK, LCD);
+    float ect = _settings.use_celsius
+              ? (s.engine_temp_f - 32.0f) * (5.0f / 9.0f)
+              : s.engine_temp_f;
+    float esc = _settings.use_celsius
+              ? (s.esc_temp_f - 32.0f) * (5.0f / 9.0f)
+              : s.esc_temp_f;
+    snprintf(buf, sizeof(buf), "ECT %d", static_cast<int>(ect));
+    _spr.drawString(buf, 6, 65);
+    snprintf(buf, sizeof(buf), "ESC %d", static_cast<int>(esc));
+    _spr.drawString(buf, 47, 65);
+    snprintf(buf, sizeof(buf), "%.1fV", s.battery_v);
+    _spr.drawString(buf, 89, 65);
+    const float odo = _settings.use_kmh ? s.odo_mi * 1.60934f : s.odo_mi;
+    snprintf(buf, sizeof(buf), "%.1f%s", odo,
+             _settings.use_kmh ? "KM" : "MI");
+    _spr.drawString(buf, 122, 65);
+
+    if (fx.alert) {
+        uint16_t bg = Anim::pulse(fx.now_ms, ALERT_PULSE_MS) ? LED_RED : LCD_INK;
+        _spr.fillRect(4, 62, 152, 14, bg);
+        snprintf(buf, sizeof(buf), "%s %.10s",
+                 uiText(_settings.language, "ALL", "WARN"),
+                 localizedRoadbookText(_settings.language, fx.alert_info));
+        _spr.setTextDatum(lgfx::MC_DATUM);
+        _spr.setFont(&lgfx::fonts::Font2);
+        _spr.setTextColor(0xFFFF, bg);
+        _spr.drawString(buf, 80, 69);
         _spr.setTextDatum(lgfx::TL_DATUM);
     }
 }
 
-void SceneDashboard::_renderThemedFinish(const UiFx& fx, const RunStats& stats) {
-    const auto& c=palette(_settings.driver_theme);
-    _spr.fillScreen(c.bg); _spr.drawRoundRect(1,1,158,78,5,c.line);
-    for(int x=-8;x<160;x+=16)
-        if(((x/16)&1)==0)_spr.fillRect(x+(fx.now_ms/90)%16,3,8,5,c.accent);
-    _spr.setTextDatum(lgfx::MC_DATUM); _spr.setFont(&lgfx::fonts::Font4);
-    _spr.setTextColor(c.ink); _spr.drawString("FINISH",80,29);
-    char spd[10],tm[12];
-    Fmt::speed(spd,stats.max_speed_mph,_settings.use_kmh);
-    Fmt::raceTime(tm,stats.stage_ms);
-    _spr.setFont(&lgfx::fonts::Font2); _spr.setTextColor(c.accent);
-    _spr.drawString(tm,48,56); _spr.drawString(spd,116,56);
+void SceneDashboard::_renderThemedFinish(const UiFx& fx,
+                                         const RunStats& stats) {
+    drawHousing(_spr);
+    drawShiftLamps(_spr, 10, true, fx.now_ms, 10);
+    _spr.setTextDatum(lgfx::MC_DATUM);
+    _spr.setFont(&lgfx::fonts::Font0);
+    _spr.setTextColor(LCD_DIM, LCD);
+    _spr.drawString(uiText(_settings.language, "SESSIONE COMPLETA",
+                           "SESSION COMPLETE"), 80, 20);
+
+    char time[14], speed[10], buf[24];
+    Fmt::raceTime(time, stats.stage_ms);
+    _spr.setFont(&lgfx::fonts::Font4);
+    _spr.setTextColor(LCD_INK, LCD);
+    _spr.drawString(time, 80, 39);
+    Fmt::speed(speed, stats.max_speed_mph, _settings.use_kmh);
+    snprintf(buf, sizeof(buf), "MAX %s %s", speed,
+             _settings.use_kmh ? "KM/H" : "MPH");
+    _spr.setFont(&lgfx::fonts::Font2);
+    _spr.drawString(buf, 48, 63);
+    snprintf(buf, sizeof(buf), "%d RPM", static_cast<int>(stats.max_rpm));
+    _spr.drawString(buf, 124, 63);
+    _spr.setTextDatum(lgfx::TL_DATUM);
+}
+
+// STOCK OFFROAD / driver display
+// Original OEM-style cluster: a premium black face, lime tach scale and amber
+// status accents.  It is intentionally distinct from both the Racepak replica
+// and the light Classic Rally skin while remaining readable at 160x80.
+namespace {
+constexpr uint16_t OEM_BG       = rgb(1, 3, 3);
+constexpr uint16_t OEM_PANEL    = rgb(9, 13, 13);
+constexpr uint16_t OEM_PANEL_2  = rgb(17, 22, 21);
+constexpr uint16_t OEM_EDGE     = rgb(69, 79, 73);
+constexpr uint16_t OEM_DIM      = rgb(130, 139, 133);
+constexpr uint16_t OEM_WHITE    = rgb(242, 245, 240);
+constexpr uint16_t OEM_LIME     = rgb(178, 226, 48);
+constexpr uint16_t OEM_AMBER    = rgb(255, 166, 24);
+constexpr uint16_t OEM_RED      = rgb(239, 48, 37);
+
+void stockDashBase(LGFX_Sprite& spr) {
+    spr.fillScreen(OEM_BG);
+    spr.fillRoundRect(1, 1, 158, 78, 7, OEM_PANEL);
+    spr.drawRoundRect(1, 1, 158, 78, 7, OEM_EDGE);
+    spr.drawFastHLine(7, 13, 146, OEM_EDGE);
+    spr.fillRoundRect(105, 16, 50, 59, 5, OEM_PANEL_2);
+    spr.drawRoundRect(105, 16, 50, 59, 5, OEM_EDGE);
+}
+
+void stockTach(LGFX_Sprite& spr, float rpm) {
+    float p = rpm / 8000.0f;
+    if (p < 0.0f) p = 0.0f;
+    if (p > 1.0f) p = 1.0f;
+    int lit = static_cast<int>(p * 25.0f + 0.5f);
+    constexpr float d2r = 0.0174532925f;
+    int old_x = 0, old_y = 0;
+    for (int i = 0; i < 26; ++i) {
+        float a = (140.0f + i * (260.0f / 25.0f)) * d2r;
+        int x = 57 + static_cast<int>(cosf(a) * 31.0f);
+        int y = 47 + static_cast<int>(sinf(a) * 31.0f);
+        uint16_t color = i <= lit
+            ? (i > 22 ? OEM_RED : OEM_LIME) : OEM_EDGE;
+        if (i) spr.drawWideLine(old_x, old_y, x, y, 1.1f, color);
+        int xi = 57 + static_cast<int>(cosf(a) * 27.0f);
+        int yi = 47 + static_cast<int>(sinf(a) * 27.0f);
+        spr.drawWideLine(x, y, xi, yi, i % 5 == 0 ? 1.2f : 0.7f, color);
+        old_x = x;
+        old_y = y;
+    }
+}
+
+void stockTopBar(LGFX_Sprite& spr, const VehicleState& s,
+                 const UiSettings& settings) {
+    char text[14];
+    spr.setFont(&lgfx::fonts::Font0);
+    spr.setTextColor(OEM_WHITE, OEM_PANEL);
+    spr.setTextDatum(lgfx::TL_DATUM);
+    snprintf(text, sizeof(text), "%.1fV", s.battery_v);
+    spr.drawString(text, 6, 4);
+    char heading[12];
+    localizedHeadingFull(settings.language, heading, s.heading_deg);
+    spr.setTextDatum(lgfx::TC_DATUM);
+    spr.setTextColor(OEM_LIME, OEM_PANEL);
+    spr.drawString(heading, 80, 4);
+    float temp = settings.use_celsius
+        ? (s.engine_temp_f - 32.0f) * (5.0f / 9.0f) : s.engine_temp_f;
+    snprintf(text, sizeof(text), "%d%c", static_cast<int>(temp),
+             settings.use_celsius ? 'C' : 'F');
+    spr.setTextDatum(lgfx::TR_DATUM);
+    spr.setTextColor(temp >= (settings.use_celsius ? 110.0f : 230.0f)
+                     ? OEM_RED : OEM_WHITE, OEM_PANEL);
+    spr.drawString(text, 153, 4);
+    spr.setTextDatum(lgfx::TL_DATUM);
+}
+}
+
+void SceneDashboard::_renderStockBoot(const VehicleState& s, const UiFx& fx) {
+    stockDashBase(_spr);
+    stockTopBar(_spr, s, _settings);
+    float q = Ease::outCubic(Anim::progress(fx.phase_ms, 0, BOOT_LOGO_MS));
+
+    // Original seven-slot off-road grille emblem, drawn from primitives.
+    _spr.fillRoundRect(43, 22, 74, 26, 5, OEM_BG);
+    _spr.drawRoundRect(43, 22, 74, 26, 5, OEM_EDGE);
+    for (int i = 0; i < 7; ++i)
+        _spr.fillRoundRect(49 + i * 9, 28, 5, 14, 2,
+                           i < static_cast<int>(q * 7.0f + 0.5f)
+                           ? OEM_LIME : OEM_EDGE);
+    _spr.setTextDatum(lgfx::MC_DATUM);
+    _spr.setFont(&lgfx::fonts::Font2);
+    _spr.setTextColor(OEM_WHITE, OEM_PANEL);
+    _spr.drawString(uiText(_settings.language, "SISTEMA TRAIL", "TRAIL SYSTEM"),
+                    80, 58);
+    _spr.setFont(&lgfx::fonts::Font0);
+    _spr.setTextColor(OEM_AMBER, OEM_PANEL);
+    _spr.drawString(uiText(_settings.language, "CONTROLLO IN CORSO",
+                           "SYSTEM CHECK"), 80, 70);
+    _spr.setTextDatum(lgfx::TL_DATUM);
+}
+
+void SceneDashboard::_renderStockLive(const VehicleState& s, const UiFx& fx,
+                                      const RunStats&) {
+    stockDashBase(_spr);
+    stockTopBar(_spr, s, _settings);
+    float rpm = _rpmF.update(s.rpm, fx.now_ms, RPM_ATTACK_MS, RPM_RELEASE_MS);
+    float speed = _speedF.update(s.speed_mph, fx.now_ms,
+                                 SPEED_SMOOTH_MS, SPEED_SMOOTH_MS);
+    stockTach(_spr, rpm);
+
+    char text[18];
+    Fmt::speed(text, speed, _settings.use_kmh);
+    _spr.setTextDatum(lgfx::MC_DATUM);
+    _spr.setFont(&lgfx::fonts::Font4);
+    _spr.setTextColor(OEM_WHITE, OEM_PANEL);
+    _spr.drawString(text, 57, 42);
+    _spr.setFont(&lgfx::fonts::Font0);
+    _spr.setTextColor(OEM_DIM, OEM_PANEL);
+    _spr.drawString(_settings.use_kmh ? "KM/H" : "MPH", 57, 58);
+    snprintf(text, sizeof(text), "%.1f", rpm / 1000.0f);
+    _spr.setTextColor(OEM_LIME, OEM_PANEL);
+    _spr.drawString(text, 57, 68);
+
+    _spr.setFont(&lgfx::fonts::Font0);
+    _spr.setTextColor(OEM_DIM, OEM_PANEL_2);
+    _spr.drawString(uiText(_settings.language, "MARCIA", "GEAR"), 130, 19);
+    Fmt::gear(text, s.gear, false);
+    _spr.setFont(&lgfx::fonts::Font4);
+    _spr.setTextColor(OEM_AMBER, OEM_PANEL_2);
+    _spr.drawString(text, 130, 36);
+
+    int fuel = static_cast<int>(s.fuel_pct * 100.0f + 0.5f);
+    if (fuel < 0) fuel = 0;
+    if (fuel > 100) fuel = 100;
+    snprintf(text, sizeof(text), "%s %d%%",
+             uiText(_settings.language, "CARB", "FUEL"), fuel);
+    _spr.setFont(&lgfx::fonts::Font0);
+    _spr.setTextColor(fuel < 15 ? OEM_RED : OEM_WHITE, OEM_PANEL_2);
+    _spr.drawString(text, 130, 58);
+    _spr.fillRoundRect(111, 68, 38, 3, 1, OEM_EDGE);
+    _spr.fillRoundRect(111, 68, fuel * 38 / 100, 3, 1,
+                       fuel < 15 ? OEM_RED : OEM_LIME);
+    _spr.setTextDatum(lgfx::TL_DATUM);
+
+    if (fx.alert) {
+        uint16_t border = Anim::pulse(fx.now_ms, ALERT_PULSE_MS)
+                        ? OEM_RED : OEM_AMBER;
+        _spr.drawRoundRect(1, 1, 158, 78, 7, border);
+        _spr.drawRoundRect(2, 2, 156, 76, 6, border);
+    }
+}
+
+void SceneDashboard::_renderStockFinish(const UiFx&, const RunStats& stats) {
+    stockDashBase(_spr);
+    _spr.setTextDatum(lgfx::MC_DATUM);
+    _spr.setFont(&lgfx::fonts::Font2);
+    _spr.setTextColor(OEM_LIME, OEM_PANEL);
+    _spr.drawString(uiText(_settings.language, "PROVA COMPLETATA",
+                           "TRAIL COMPLETE"), 80, 18);
+    char time[14], speed[12], text[28];
+    Fmt::raceTime(time, stats.stage_ms);
+    _spr.setFont(&lgfx::fonts::Font4);
+    _spr.setTextColor(OEM_WHITE, OEM_PANEL);
+    _spr.drawString(time, 80, 40);
+    Fmt::speed(speed, stats.max_speed_mph, _settings.use_kmh);
+    snprintf(text, sizeof(text), "%s %s %s",
+             uiText(_settings.language, "MAX", "MAX"), speed,
+             _settings.use_kmh ? "KM/H" : "MPH");
+    _spr.setFont(&lgfx::fonts::Font2);
+    _spr.setTextColor(OEM_AMBER, OEM_PANEL);
+    _spr.drawString(text, 80, 63);
     _spr.setTextDatum(lgfx::TL_DATUM);
 }
 #endif

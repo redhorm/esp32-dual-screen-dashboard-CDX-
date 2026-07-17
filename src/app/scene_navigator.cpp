@@ -52,14 +52,17 @@ static constexpr float AA_STROKE = 1.3f;  // arrow shaft radius (wedge line)
 SceneNavigator::SceneNavigator(lgfx::LGFX_Device& disp, const Roadbook& rb)
     : _spr(&disp), _disp(disp), _rb(rb) {}
 
-void SceneNavigator::init() {
+bool SceneNavigator::init() {
     _spr.setColorDepth(16);
     _spr.setPsram(false);          // internal RAM → DMA-friendly (112.5 KB)
-    _spr.createSprite(W, H);
-    _fonts.init();
+    _ready = _spr.createSprite(W, H) != nullptr;
+    if (!_ready) return false;
+    _ready = _fonts.init();
+    return _ready;
 }
 
 void SceneNavigator::push() {
+    if (!_ready) return;
     _spr.pushSprite(&_disp, 0, 0);
 }
 
@@ -580,6 +583,7 @@ void SceneNavigator::_renderFinish(const UiFx& fx, const RunStats& stats) {
 
 void SceneNavigator::render(const VehicleState& s, const UiFx& fx,
                             const RunStats& stats) {
+    if (!_ready) return;
     if (_portalCredentialsVisible) {
         _renderPortalCredentials();
         return;

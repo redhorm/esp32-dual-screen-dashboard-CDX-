@@ -43,9 +43,13 @@ PHOTOS = {
     "degraded": False, "uploadActive": False, "lastError": "none",
     "driverMaxBytes": 65_536, "navigatorMaxBytes": 196_608,
     "reserveBytes": 32_768,
+    "systemAssetBytes": 118_400, "userPhotoBytes": 372_000,
+    "gameAssetBytes": 122_000,
+    "breakdown": {"systemAssetBytes": 118_400, "userPhotoBytes": 372_000,
+                  "gameAssetBytes": 122_000, "transactionBytes": 0},
 }
 STATE = {
-    "ok": True, "version": "4.1.0-beta.1", "nowMs": 18_420,
+    "ok": True, "version": "5.0.0-beta.1", "nowMs": 18_420,
     "mode": "dashboard",
     "identity": {
         "number": "4400", "vehicle": "TRAIL WOLF",
@@ -80,6 +84,59 @@ RTL = {
     "escReverseConfirmMs": 220, "pixels": [],
 }
 
+GAME_V4 = {
+    "ok": True, "version": "5.0.0-beta.1", "protocol": 4,
+    "experienceMode": "dashboard", "status": "idle",
+    "mode": "time_attack", "seed": 4400,
+    "ackSeq": 0, "serverMs": 18_420, "controllerAlive": False,
+    "inputRttMs": 18, "rpm": 900, "speed": 0, "steer": 0,
+    "throttle": 0, "brake": 0,
+    "score": 0, "checkpoint": 0, "totalCheckpoints": 12,
+    "timeMs": 0, "bestMs": 48_620, "damage": 0, "tempC": 72,
+    "grip": 1000, "distanceCm": 0, "courseLengthCm": 342_000,
+    "objects": [], "audio": [],
+}
+AUDIO_EVENTS = []
+AUDIO_SEQ = 0
+INPUT_RECEIVED = 0
+INPUT_LOST = 0
+LAST_INPUT_AT = 0
+SCENARIO = "normal"
+REQUEST_COUNT = 0
+
+DIAGNOSTICS = {
+    "ok": True, "firmware": "5.0.0-beta.1", "protocol": 4,
+    "uptimeMs": 18_420,
+    "displayA": {"ok": True, "fps": 30, "frames": 12_860,
+                 "heartbeatAgeMs": 12, "stackFreeBytes": 2_912,
+                 "frameAvgUs": 33_210, "frameMaxUs": 39_500,
+                 "renderAvgUs": 3_380, "renderMaxUs": 7_920,
+                 "pushAvgUs": 27_200, "pushMaxUs": 30_100},
+    "displayB": {"ok": True, "fps": 15, "frames": 6_430,
+                 "heartbeatAgeMs": 26, "stackFreeBytes": 4_736,
+                 "frameAvgUs": 66_420, "frameMaxUs": 72_800,
+                 "renderAvgUs": 4_820, "renderMaxUs": 9_210,
+                 "pushAvgUs": 54_100, "pushMaxUs": 58_300},
+    "memory": {"heapFreeBytes": 241_664, "heapMinBytes": 212_480,
+               "heapLargestBytes": 131_072, "psramPresent": False,
+               "psramFreeBytes": 0, "psramTotalBytes": 0},
+    "storage": {"ready": True, "totalBytes": 5_177_344,
+                "usedBytes": 612_400, "freeBytes": 4_564_944,
+                "systemAssetBytes": 118_400,
+                "userPhotoBytes": 372_000, "gameAssetBytes": 122_000,
+                "transactionBytes": 0},
+    "wifi": {"online": True, "clients": 1},
+    "input": {"packets": 0, "accepted": 0, "lost": 0, "stale": 0,
+              "timeouts": 0, "latencyMs": 18, "latencyAvgMs": 18,
+              "latencyMaxMs": 31, "controllerAlive": False},
+    "rtl": {"ok": True, "controlAlive": True, "controlAgeMs": 4,
+            "controlStackFreeBytes": 2_176},
+    "esc": {"enabled": False, "valid": False, "pulseUs": 0},
+    "lastError": "none",
+    "restartCount": 3, "resetReason": "power_on",
+    "resetReasonCode": 1,
+}
+
 BOOT_CLOCK = time.monotonic()
 GAME_STARTED = None
 GAME_PAUSED_AT = None
@@ -88,6 +145,86 @@ RTL_COMMAND_AT = time.monotonic()
 
 def clock_ms():
     return (18_420 + int((time.monotonic() - BOOT_CLOCK) * 1000)) & 0xFFFFFFFF
+
+
+def emit_audio(kind, value=1.0):
+    global AUDIO_SEQ
+    AUDIO_SEQ += 1
+    AUDIO_EVENTS.append({"seq": AUDIO_SEQ, "type": kind, "value": value})
+    del AUDIO_EVENTS[:-24]
+
+
+def update_game_v4():
+    now = clock_ms()
+    GAME_V4["serverMs"] = now
+    GAME_V4["nowMs"] = now
+    GAME_V4["controllerAlive"] = bool(
+        LAST_INPUT_AT and now - LAST_INPUT_AT <= 350)
+    if GAME_V4["status"] == "countdown" and GAME_STARTED is not None:
+        elapsed = max(0, now - GAME_STARTED)
+        if elapsed >= 2400:
+            GAME_V4["status"] = "running"
+            emit_audio("engine_start")
+    if GAME_V4["status"] != "running" or GAME_STARTED is None:
+        return
+    elapsed = max(0, now - GAME_STARTED - 2400)
+    throttle = GAME_V4["throttle"] / 100
+    brake = GAME_V4["brake"] / 100
+    speed = max(0, int(38 + throttle * 182 - brake * 150))
+    distance = elapsed * speed / 1000
+    checkpoint = min(GAME_V4["totalCheckpoints"], int(distance // 285))
+    old_checkpoint = GAME_V4["checkpoint"]
+    if checkpoint > old_checkpoint:
+        emit_audio("checkpoint")
+    lanes = (-80, 74, -20, 96, -110, 42, 8, -64, 118, -35, 55, 0)
+    objects = []
+    for index in range(checkpoint, min(12, checkpoint + 4)):
+        ahead = max(0, int((index + 1) * 285 - distance))
+        objects.append({"distanceDm": ahead * 5, "lateral": lanes[index],
+                        "radius": 13 + index % 7,
+                        "kind": ("boulder", "gate", "rut")[index % 3]})
+    GAME_V4.update(timeMs=elapsed, speed=speed, rpm=900 + speed * 29,
+                   distanceCm=int(distance * 100), worldDistance=int(distance),
+                   lineX=int(GAME_V4["steer"] * .65), checkpoint=checkpoint,
+                   score=elapsed // 10 + checkpoint * 350,
+                   tempC=min(112, 72 + int(throttle * 28)),
+                   grip=max(350, 1000 - abs(GAME_V4["steer"]) // 2),
+                   objects=objects)
+    if checkpoint >= GAME_V4["totalCheckpoints"]:
+        GAME_V4["status"] = "finished"
+        GAME_V4["speed"] = 0
+        emit_audio("finish")
+
+
+def game_payload(audio_after=0):
+    update_game_v4()
+    out = deepcopy(GAME_V4)
+    out["audio"] = [event for event in AUDIO_EVENTS
+                    if event["seq"] > audio_after]
+    return out
+
+
+def photos_payload():
+    out = deepcopy(PHOTOS)
+    if SCENARIO == "storage-full":
+        out.update(usedBytes=out["totalBytes"] - 12_000, freeBytes=12_000)
+        out["userPhotoBytes"] = out["usedBytes"] - out["systemAssetBytes"] - out["gameAssetBytes"]
+        out["breakdown"]["userPhotoBytes"] = out["userPhotoBytes"]
+    elif SCENARIO == "fs-offline":
+        out.update(fsReady=False, storageState="unavailable", usedBytes=0,
+                   totalBytes=0, freeBytes=0, degraded=True,
+                   lastError="filesystem_unavailable", bootDriver=False,
+                   bootNavigator=False, slots=[])
+    return out
+
+
+def adjust_photo_storage(delta):
+    PHOTOS["userPhotoBytes"] = max(0, PHOTOS["userPhotoBytes"] + delta)
+    PHOTOS["breakdown"]["userPhotoBytes"] = PHOTOS["userPhotoBytes"]
+    PHOTOS["usedBytes"] = (PHOTOS["systemAssetBytes"] +
+                           PHOTOS["gameAssetBytes"] +
+                           PHOTOS["userPhotoBytes"])
+    PHOTOS["freeBytes"] = max(0, PHOTOS["totalBytes"] - PHOTOS["usedBytes"])
 
 
 def obstacle_views(distance):
@@ -184,25 +321,60 @@ class Handler(BaseHTTPRequestHandler):
         if body: self.wfile.write(body)
 
     def do_GET(self):
+        global SCENARIO, REQUEST_COUNT
         parsed = urlparse(self.path)
         path = parsed.path
         args = parse_qs(parsed.query)
-        if path in ("/api/v2/state", "/api/v3/state", "/api/v2/profile", "/api/v3/profile"):
+        REQUEST_COUNT += 1
+        if path == "/" and "scenario" in args:
+            SCENARIO = args["scenario"][0]
+        if SCENARIO == "loss" and path.startswith("/api/") and REQUEST_COUNT % 6 == 0:
+            self._send({"ok": False, "error": "simulated_link_loss"}, status=503)
+        elif path == "/api/v4/game/state":
+            after = int(args.get("audioAfter", ["0"])[0] or 0)
+            self._send(game_payload(after))
+        elif path == "/api/v4/diagnostics":
+            photo_state = photos_payload()
+            DIAGNOSTICS["uptimeMs"] = clock_ms()
+            DIAGNOSTICS["input"].update(packets=INPUT_RECEIVED,
+                                        accepted=INPUT_RECEIVED,
+                                        lost=INPUT_LOST,
+                                        latencyMs=GAME_V4["inputRttMs"],
+                                        controllerAlive=GAME_V4["controllerAlive"])
+            DIAGNOSTICS["storage"].update(
+                ready=photo_state["fsReady"],
+                totalBytes=photo_state["totalBytes"],
+                usedBytes=photo_state["usedBytes"],
+                freeBytes=photo_state["freeBytes"],
+                systemAssetBytes=photo_state["systemAssetBytes"],
+                userPhotoBytes=photo_state["userPhotoBytes"],
+                gameAssetBytes=photo_state["gameAssetBytes"])
+            DIAGNOSTICS["lastError"] = "none"
+            if SCENARIO == "fs-offline":
+                DIAGNOSTICS["storage"]["ready"] = False
+                DIAGNOSTICS["lastError"] = "filesystem_unavailable"
+            self._send(DIAGNOSTICS)
+        elif path in ("/api/v2/state", "/api/v3/state", "/api/v2/profile", "/api/v3/profile"):
             self._send(current_state())
         elif path in ("/api/v2/capabilities", "/api/v3/capabilities"):
-            self._send({"ok": True, "protocol": 3, "version": "4.1.0-beta.1",
-                        "features": ["offroadArcade", "rtlController", "escStateMachine",
+            self._send({"ok": True, "protocol": 4, "version": "5.0.0-beta.1",
+                        "features": ["trailAssault", "rtlController", "escStateMachine",
                                      "realismDash", "stockOffroadDash", "bilingualUi",
                                      "photoStorageV3", "mediaPreview",
+                                     "webAudio", "diagnosticsV4", "analogController",
                                      "uniqueApCredentials", "rtlOutputWatchdog"],
-                        "maxClients": 2, "stateHz": 5, "inputHz": 10})
+                        "maxClients": 2, "stateHz": 10, "inputHz": 20})
         elif path == "/api/settings": self._send(SETTINGS)
-        elif path == "/api/photos": self._send(PHOTOS)
+        elif path == "/api/photos": self._send(photos_payload())
         elif path == "/api/v3/rtl/state":
             update_rtl_pixels(); self._send(RTL)
         elif path in ("/api/media/boot", "/api/media/photo"):
-            slot = args.get("slot", ["BOOT"])[0]
-            self._send(preview_svg(f"PHOTO {slot}"), "image/svg+xml")
+            if SCENARIO == "fs-offline":
+                self._send({"ok": False, "error": "filesystem_unavailable"},
+                           status=503)
+            else:
+                slot = args.get("slot", ["BOOT"])[0]
+                self._send(preview_svg(f"PHOTO {slot}"), "image/svg+xml")
         elif path == "/qa-sample.png":
             self._send(QA_PNG, "image/png")
         else:
@@ -211,6 +383,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         global GAME_STARTED, GAME_PAUSED_AT, RTL_COMMAND_AT
+        global INPUT_RECEIVED, INPUT_LOST, LAST_INPUT_AT, REQUEST_COUNT
         length = int(self.headers.get("Content-Length", 0))
         raw = self.rfile.read(length)
         parsed = urlparse(self.path)
@@ -218,8 +391,63 @@ class Handler(BaseHTTPRequestHandler):
         body = raw.decode(errors="ignore") if "multipart/form-data" not in content_type else ""
         args = parse_qs(parsed.query); args.update(parse_qs(body))
         path = parsed.path
+        REQUEST_COUNT += 1
 
-        if path in ("/api/v2/profile", "/api/v3/profile"):
+        if SCENARIO == "loss" and path.startswith("/api/") and REQUEST_COUNT % 5 == 0:
+            self._send({"ok": False, "error": "simulated_link_loss"}, status=503)
+            return
+        if SCENARIO == "fs-offline" and path.startswith("/api/upload/"):
+            self._send({"ok": False, "error": "filesystem_unavailable"}, status=503)
+            return
+        if SCENARIO == "storage-full" and path.startswith("/api/upload/"):
+            self._send({"ok": False, "error": "no_space"}, status=507)
+            return
+
+        if path == "/api/v4/game/config":
+            mode = args.get("mode", ["time_attack"])[0]
+            if mode not in ("time_attack", "gate_rush", "hill_climb"):
+                mode = "time_attack"
+            try: seed = max(1, int(args.get("seed", ["4400"])[0]))
+            except ValueError: seed = 4400
+            GAME_V4.update(mode=mode, seed=seed, status="attract",
+                           experienceMode="game")
+        elif path == "/api/v4/game/input":
+            seq = int(args.get("seq", ["0"])[0] or 0)
+            if GAME_V4["ackSeq"] and seq > GAME_V4["ackSeq"] + 1:
+                INPUT_LOST += seq - GAME_V4["ackSeq"] - 1
+            INPUT_RECEIVED += 1
+            LAST_INPUT_AT = clock_ms()
+            steer = max(-100, min(100, int(args.get("steer", ["0"])[0])))
+            throttle = max(0, min(100, int(args.get("throttle", ["0"])[0])))
+            brake = max(0, min(100, int(args.get("brake", ["0"])[0])))
+            GAME_V4.update(ackSeq=seq, controllerAlive=True, inputRttMs=18,
+                           steer=steer, throttle=throttle, brake=brake)
+        elif path == "/api/v4/game/neutral":
+            LAST_INPUT_AT = 0
+            seq = int(args.get("seq", [str(GAME_V4["ackSeq"] + 1)])[0])
+            GAME_V4.update(ackSeq=seq, controllerAlive=False, steer=0,
+                           throttle=0, brake=0)
+        elif path == "/api/v4/game/action":
+            action = args.get("action", ["quit"])[0]
+            if action in ("start", "restart"):
+                GAME_STARTED = clock_ms(); GAME_PAUSED_AT = None
+                GAME_V4.update(status="countdown", experienceMode="game",
+                               score=0, checkpoint=0, timeMs=0, damage=0,
+                               distanceCm=0, objects=[])
+                emit_audio("countdown")
+            elif action == "pause" and GAME_V4["status"] == "running":
+                GAME_PAUSED_AT = clock_ms(); GAME_V4["status"] = "paused"
+            elif action == "resume" and GAME_V4["status"] == "paused":
+                if GAME_STARTED is not None and GAME_PAUSED_AT is not None:
+                    GAME_STARTED += clock_ms() - GAME_PAUSED_AT
+                GAME_PAUSED_AT = None; GAME_V4["status"] = "running"
+            elif action in ("exit", "quit"):
+                GAME_STARTED = None; GAME_PAUSED_AT = None
+                GAME_V4.update(status="idle", experienceMode="dashboard",
+                               speed=0, rpm=900,
+                               controllerAlive=False, steer=0, throttle=0,
+                               brake=0)
+        elif path in ("/api/v2/profile", "/api/v3/profile"):
             for key in ("number", "vehicle", "driver"):
                 if key in args:
                     target = "vehicleName" if key == "vehicle" else key
@@ -283,14 +511,33 @@ class Handler(BaseHTTPRequestHandler):
             RTL_COMMAND_AT = time.monotonic(); RTL["timedOut"] = False
         elif path == "/api/photos/commit":
             slot = int(args.get("slot", ["0"])[0])
-            if slot not in PHOTOS["slots"]: PHOTOS["slots"].append(slot)
+            if slot not in PHOTOS["slots"]:
+                PHOTOS["slots"].append(slot); adjust_photo_storage(92_000)
         elif path == "/api/photos/delete":
             slot = int(args.get("slot", ["-1"])[0])
-            if slot in PHOTOS["slots"]: PHOTOS["slots"].remove(slot)
-        elif path == "/api/boot/commit": PHOTOS.update(bootDriver=True, bootNavigator=True)
-        elif path == "/api/boot/delete": PHOTOS.update(bootDriver=False, bootNavigator=False)
+            if slot in PHOTOS["slots"]:
+                PHOTOS["slots"].remove(slot); adjust_photo_storage(-92_000)
+        elif path == "/api/boot/commit":
+            if not (PHOTOS["bootDriver"] and PHOTOS["bootNavigator"]):
+                adjust_photo_storage(74_000)
+            PHOTOS.update(bootDriver=True, bootNavigator=True)
+        elif path == "/api/boot/delete":
+            if PHOTOS["bootDriver"] or PHOTOS["bootNavigator"]:
+                adjust_photo_storage(-74_000)
+            PHOTOS.update(bootDriver=False, bootNavigator=False)
 
-        if path == "/api/v2/game/input": self._send(b"", "text/plain", 204)
+        if path == "/api/v4/game/input":
+            self._send({"ok": True, "accepted": True,
+                        "seq": GAME_V4["ackSeq"],
+                        "serverMs": clock_ms(),
+                        "result": "accepted",
+                        "inputRttMs": GAME_V4["inputRttMs"]})
+        elif path == "/api/v4/game/neutral":
+            self._send({"ok": True, "seq": GAME_V4["ackSeq"],
+                        "serverMs": clock_ms(), "result": "accepted"})
+        elif path.startswith("/api/v4/game/"):
+            self._send(game_payload())
+        elif path == "/api/v2/game/input": self._send(b"", "text/plain", 204)
         elif path.startswith("/api/v3/rtl/"):
             update_rtl_pixels(); self._send(RTL)
         elif path.startswith("/api/v2/game/"): self._send(current_state())

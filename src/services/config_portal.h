@@ -6,6 +6,7 @@
 #include <WebServer.h>
 #include "core/ui_settings.h"
 #include "core/experience.h"
+#include "core/diagnostics.h"
 #include "core/rtl_logic.h"
 #include "hal/ws2812_rtl.h"
 #include "hal/esc_pwm_input.h"
@@ -14,9 +15,14 @@
 class ConfigPortal {
 public:
     ConfigPortal(ExperienceEngine& experience, RtlLogic& rtl,
-                 Ws2812Rtl& rtl_hw, EscPwmInput& esc_input);
+                 Ws2812Rtl& rtl_hw, EscPwmInput& esc_input,
+                 DiagnosticsRegistry& diagnostics);
     bool begin();
     void handle();
+    // Called by the dedicated high-priority control task.  No web, NVS or
+    // filesystem work is performed here.
+    void controlIoTick();
+    void fillDiagnosticsSlowHealth(DiagnosticsSlowHealth& health);
     const UiSettings& settings() const { return _settings; }
     const char* ipString() const { return _ip; }
     const char* ssidString() const { return _ssid; }
@@ -32,15 +38,20 @@ private:
     RtlLogic&   _rtl;
     Ws2812Rtl&  _rtl_hw;
     EscPwmInput& _esc_input;
+    DiagnosticsRegistry& _diagnostics;
     char        _ip[16] = "0.0.0.0";
     char        _ssid[24] = CONFIG_AP_SSID_PREFIX;
     char        _password[16] = {};
     bool        _setup_complete = false;
     uint8_t     _rtl_brightness = RTL_LED_BRIGHTNESS;
+    RtlProfile  _rtl_profile = RtlProfile::ULTRA4_4400;
     bool        _esc_enabled = ESC_PWM_INPUT_ENABLED != 0;
     EscSignalConfig _esc_config;
     uint16_t    _esc_deadband_us = 45;
     EscPwmSample _esc_sample;
+    RtlFrame     _rtl_frame;
+    portMUX_TYPE _io_mux = portMUX_INITIALIZER_UNLOCKED;
+    bool        _io_reconfigure_pending = false;
     RtlCommandState _manual_rtl;
     uint32_t    _manual_rtl_at_ms = 0;
     bool        _manual_rtl_active = false;
@@ -56,15 +67,42 @@ private:
     uint8_t     _pair_slot = 0;
     uint32_t    _pair_started_ms = 0;
     char        _pair_tx[17] = "";
+    char        _json_buffer[4096] = {};
+    bool        _controller_was_alive = false;
+    bool        _input_offset_known = false;
+    uint32_t    _input_min_offset_ms = 0;
+    uint32_t    _diagnostic_input_sequence = 0;
+    uint16_t    _last_input_sequence = 0;
+    bool        _has_input_sequence = false;
+    uint32_t    _restart_count = 0;
+    uint32_t    _reset_reason_code = 0;
+    char        _reset_reason[DIAGNOSTICS_RESET_TEXT_SIZE] = "unknown";
+    uint32_t    _config_sequence = 0;
+    uint8_t     _config_slot = 0;
+    bool        _config_save_pending = false;
+    bool        _ghost_save_pending = false;
+    uint32_t    _config_retry_at_ms = 0;
+    uint32_t    _ghost_retry_at_ms = 0;
 
     void _load();
-    void _save();
+    bool _save();
+    bool _saveLegacyMirror();
+    void _loadVersionedConfig();
+    bool _saveVersionedConfig();
+    bool _saveVersionedConfigWithRtl(RtlProfile profile,
+                                     uint8_t brightness,
+                                     bool esc_enabled,
+                                     const EscSignalConfig& esc_config,
+                                     uint16_t deadband_us);
+    void _loadGhost();
+    bool _saveGhost();
     void _loadNetworkIdentity();
     void _sendSettings();
     void _saveSettings();
     void _sendPortal();
     void _sendPhotos();
     void _sendMediaAsset(bool boot);
+    bool _rejectMediaWhileGameActive();
     void _deletePhoto();
     void _deleteBoot();
     void _commitPhotoUpload();
@@ -79,6 +117,14 @@ private:
     void _resetPairUpload();
     void _sendCapabilities();
     void _sendExperienceState();
+    void _sendGameStateV4();
+    void _configureGameV4();
+    void _inputGameV4();
+    void _neutralGameV4();
+    void _gameActionV4();
+    void _sendDiagnostics();
+    void _recordInputDiagnostic(uint16_t sequence, uint32_t latency_ms,
+                                bool accepted);
     void _sendProfile();
     void _saveProfile();
     void _startGame();

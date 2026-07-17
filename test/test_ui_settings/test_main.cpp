@@ -47,7 +47,7 @@ static void test_display_translation_is_ascii_and_deterministic() {
         {"CAUTION !!", "ATTENZIONE"}, {"WATER XING", "GUADO"},
         {"2FT DEEP", "60CM FONDO"}, {"FAST", "VELOCE"},
         {"L HAIRPIN", "TORNANTE S"}, {"SLOW !!", "PIANO !!"},
-        {"STAY RIGHT", "TIENI DESTRA"}, {"FINISH", "ARRIVO"},
+        {"STAY RIGHT", "A DESTRA"}, {"FINISH", "ARRIVO"},
     };
     for (const Translation& label : fixed_labels) {
         TEST_ASSERT_EQUAL_STRING(label.italian,

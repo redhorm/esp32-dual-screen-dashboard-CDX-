@@ -56,13 +56,15 @@ constexpr int BOX_R = 3;
 SceneDashboard::SceneDashboard(lgfx::LGFX_Device& disp)
     : _spr(&disp), _disp(disp) {}
 
-void SceneDashboard::init() {
+bool SceneDashboard::init() {
     _spr.setColorDepth(16);
     _spr.setPsram(false);          // internal RAM → DMA-friendly
-    _spr.createSprite(Lay::W, Lay::H);
+    _ready = _spr.createSprite(Lay::W, Lay::H) != nullptr;
+    return _ready;
 }
 
 void SceneDashboard::push() {
+    if (!_ready) return;
     _spr.pushSprite(&_disp, 0, 0);
 }
 
@@ -391,7 +393,8 @@ void SceneDashboard::_renderLive(const VehicleState& s, const UiFx& fx,
     _drawRPMBar(rpm_bar, flash_on);
     _drawSwoosh();
     char rv[8];
-    snprintf(rv, sizeof(rv), "%d", (int)s.rpm);   // raw: jitter keeps it alive
+    const int stable_rpm = static_cast<int>(rpm_bar / 10.0f + 0.5f) * 10;
+    snprintf(rv, sizeof(rv), "%d", stable_rpm);
     _drawFramedValue(Lay::RPMBOX_X, Lay::RPMBOX_Y, Lay::RPMBOX_W, Lay::RPMBOX_H,
                      rv, &lgfx::fonts::Font4, Col::INK, "RPM", 2);
     _drawGearBox(s.gear, fx);
@@ -455,6 +458,7 @@ void SceneDashboard::_renderFinish(const VehicleState& s, const UiFx& fx,
 
 void SceneDashboard::render(const VehicleState& s, const UiFx& fx,
                             const RunStats& stats) {
+    if (!_ready) return;
     if (_portalCredentialsVisible) {
         _renderPortalCredentials();
         return;

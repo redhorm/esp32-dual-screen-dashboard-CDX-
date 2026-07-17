@@ -17,7 +17,8 @@
 class SceneDashboard {
 public:
     explicit SceneDashboard(lgfx::LGFX_Device& disp);
-    void init();
+    bool init();
+    bool ready() const { return _ready; }
     void setSettings(const UiSettings& settings) { _settings = settings; }
     void setExperienceFrame(const ExperienceFrame& frame) { _experience = frame; }
     void setPortalCredentials(bool visible, const char* ssid,
@@ -35,10 +36,11 @@ private:
     bool                _portalCredentialsVisible = false;
     char                _portalSsid[24] = "";
     char                _portalPassword[16] = "";
+    bool                _ready = false;
 
     Follow _rpmF;    // RPM bar smoothing, VU-meter attack/release
     Follow _speedF;  // speed readout smoothing
-    ShiftLightController _shiftLights;  // stable IQ3S upper LED quantizer
+    ShiftLightController _shiftLights;  // stable upper LED quantizer
 
     // Phase screens
     void _renderBoot(const VehicleState& s, const UiFx& fx);

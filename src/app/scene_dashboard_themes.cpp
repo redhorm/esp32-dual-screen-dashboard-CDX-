@@ -8,7 +8,7 @@
 #include "config.h"
 
 // REALISM / driver display
-// A code-native, 160x80 interpretation of the Racepak IQ3S: dark moulded
+// An original code-native 160x80 competition instrument: dark moulded
 // housing, cyan LCD, 1-9 tach scale, ten external shift lamps and compact
 // race telemetry.  The Classic Rally renderer remains in scene_dashboard.cpp.
 namespace {
@@ -46,7 +46,7 @@ void drawShiftLamps(LGFX_Sprite& spr, int stable_lit, bool warning,
     if (lit > 10) lit = 10;
     bool flash = warning && Anim::pulse(now_ms, SHIFT_FLASH_MS);
 
-    // Four warning lamps flank the progressive strip, as on the IQ3S face.
+    // Four warning lamps flank the progressive strip.
     constexpr int warn_x[4] = {5, 13, 147, 155};
     for (int i = 0; i < 4; ++i) {
         bool on = warning && (i == 0 || i == 3 || flash);
@@ -108,10 +108,10 @@ void SceneDashboard::_renderThemedBoot(const VehicleState&, const UiFx& fx) {
     _spr.setTextDatum(lgfx::MC_DATUM);
     _spr.setFont(&lgfx::fonts::Font4);
     _spr.setTextColor(Anim::lerp565(LCD, LCD_INK, q), LCD);
-    _spr.drawString("RACEPAK", 80, 35);
+    _spr.drawString("ULTRA4", 80, 35);
     _spr.setFont(&lgfx::fonts::Font2);
     _spr.setTextColor(LCD_INK, LCD);
-    _spr.drawString("IQ3S", 80, 57);
+    _spr.drawString("RACE DATA", 80, 57);
     _spr.setFont(&lgfx::fonts::Font0);
     _spr.setTextColor(LCD_DIM, LCD);
     _spr.drawString(uiText(_settings.language, "LOGGER / CONTROLLO",
@@ -120,7 +120,7 @@ void SceneDashboard::_renderThemedBoot(const VehicleState&, const UiFx& fx) {
 }
 
 void SceneDashboard::_renderThemedLive(const VehicleState& s, const UiFx& fx,
-                                       const RunStats&) {
+                                       const RunStats& stats) {
     drawHousing(_spr);
     float rpm = _rpmF.update(s.rpm, fx.now_ms, RPM_ATTACK_MS, RPM_RELEASE_MS);
     float speed = _speedF.update(s.speed_mph, fx.now_ms,
@@ -132,7 +132,7 @@ void SceneDashboard::_renderThemedLive(const VehicleState& s, const UiFx& fx,
     drawTachScale(_spr, rpm);
 
     char buf[18];
-    // Main IQ3S readouts: speed left, large gear in the centre, fuel right.
+    // Main race readouts: speed left, large gear in the centre, fuel right.
     _spr.setTextDatum(lgfx::TC_DATUM);
     _spr.setFont(&lgfx::fonts::Font0);
     _spr.setTextColor(LCD_DIM, LCD);
@@ -157,10 +157,10 @@ void SceneDashboard::_renderThemedLive(const VehicleState& s, const UiFx& fx,
         _spr.fillRect(112 + i * 8, 57, 6, 3,
                       i * 20 < fuel ? LCD_INK : LCD_DIM);
 
-    // Lower four-channel telemetry ribbon, intentionally dense like the real LCD.
+    // Four fixed telemetry cells prevent long values from colliding at 160 px.
     _spr.drawFastHLine(6, 62, 148, LCD_DIM);
     _spr.setFont(&lgfx::fonts::Font0);
-    _spr.setTextDatum(lgfx::TL_DATUM);
+    _spr.setTextDatum(lgfx::TC_DATUM);
     _spr.setTextColor(LCD_INK, LCD);
     float ect = _settings.use_celsius
               ? (s.engine_temp_f - 32.0f) * (5.0f / 9.0f)
@@ -168,16 +168,22 @@ void SceneDashboard::_renderThemedLive(const VehicleState& s, const UiFx& fx,
     float esc = _settings.use_celsius
               ? (s.esc_temp_f - 32.0f) * (5.0f / 9.0f)
               : s.esc_temp_f;
-    snprintf(buf, sizeof(buf), "ECT %d", static_cast<int>(ect));
-    _spr.drawString(buf, 6, 65);
-    snprintf(buf, sizeof(buf), "ESC %d", static_cast<int>(esc));
-    _spr.drawString(buf, 47, 65);
+    const uint32_t minutes = (stats.stage_ms / 60000UL) % 100UL;
+    const uint32_t seconds = (stats.stage_ms / 1000UL) % 60UL;
+    snprintf(buf, sizeof(buf), "%lu:%02lu",
+             static_cast<unsigned long>(minutes),
+             static_cast<unsigned long>(seconds));
+    _spr.drawString(buf, 23, 65);
+    snprintf(buf, sizeof(buf), "ECT%d", static_cast<int>(ect));
+    _spr.drawString(buf, 61, 65);
+    snprintf(buf, sizeof(buf), "ESC%d", static_cast<int>(esc));
+    _spr.drawString(buf, 99, 65);
     snprintf(buf, sizeof(buf), "%.1fV", s.battery_v);
-    _spr.drawString(buf, 89, 65);
-    const float odo = _settings.use_kmh ? s.odo_mi * 1.60934f : s.odo_mi;
-    snprintf(buf, sizeof(buf), "%.1f%s", odo,
-             _settings.use_kmh ? "KM" : "MI");
-    _spr.drawString(buf, 122, 65);
+    _spr.drawString(buf, 137, 65);
+    _spr.drawFastVLine(42, 64, 10, LCD_DIM);
+    _spr.drawFastVLine(80, 64, 10, LCD_DIM);
+    _spr.drawFastVLine(118, 64, 10, LCD_DIM);
+    _spr.setTextDatum(lgfx::TL_DATUM);
 
     if (fx.alert) {
         uint16_t bg = Anim::pulse(fx.now_ms, ALERT_PULSE_MS) ? LED_RED : LCD_INK;
@@ -218,10 +224,8 @@ void SceneDashboard::_renderThemedFinish(const UiFx& fx,
     _spr.setTextDatum(lgfx::TL_DATUM);
 }
 
-// STOCK OFFROAD / driver display
-// Original OEM-style cluster: a premium black face, lime tach scale and amber
-// status accents.  It is intentionally distinct from both the Racepak replica
-// and the light Classic Rally skin while remaining readable at 160x80.
+// TRAIL COMMAND / driver display. Speed stays king; the thin RPM band is the
+// single driving instrument added above it, keeping the panel fast and sparse.
 namespace {
 constexpr uint16_t OEM_BG       = rgb(1, 3, 3);
 constexpr uint16_t OEM_PANEL    = rgb(9, 13, 13);
@@ -237,31 +241,26 @@ void stockDashBase(LGFX_Sprite& spr) {
     spr.fillScreen(OEM_BG);
     spr.fillRoundRect(1, 1, 158, 78, 7, OEM_PANEL);
     spr.drawRoundRect(1, 1, 158, 78, 7, OEM_EDGE);
-    spr.drawFastHLine(7, 13, 146, OEM_EDGE);
-    spr.fillRoundRect(105, 16, 50, 59, 5, OEM_PANEL_2);
-    spr.drawRoundRect(105, 16, 50, 59, 5, OEM_EDGE);
+    spr.fillRoundRect(5, 3, 150, 18, 4, OEM_PANEL_2);
+    spr.drawFastHLine(7, 60, 146, OEM_EDGE);
+    spr.drawFastHLine(7, 72, 146, OEM_EDGE);
 }
 
 void stockTach(LGFX_Sprite& spr, float rpm) {
     float p = rpm / 8000.0f;
     if (p < 0.0f) p = 0.0f;
     if (p > 1.0f) p = 1.0f;
-    int lit = static_cast<int>(p * 25.0f + 0.5f);
-    constexpr float d2r = 0.0174532925f;
-    int old_x = 0, old_y = 0;
-    for (int i = 0; i < 26; ++i) {
-        float a = (140.0f + i * (260.0f / 25.0f)) * d2r;
-        int x = 57 + static_cast<int>(cosf(a) * 31.0f);
-        int y = 47 + static_cast<int>(sinf(a) * 31.0f);
-        uint16_t color = i <= lit
-            ? (i > 22 ? OEM_RED : OEM_LIME) : OEM_EDGE;
-        if (i) spr.drawWideLine(old_x, old_y, x, y, 1.1f, color);
-        int xi = 57 + static_cast<int>(cosf(a) * 27.0f);
-        int yi = 47 + static_cast<int>(sinf(a) * 27.0f);
-        spr.drawWideLine(x, y, xi, yi, i % 5 == 0 ? 1.2f : 0.7f, color);
-        old_x = x;
-        old_y = y;
+    int lit = static_cast<int>(p * 40.0f + 0.5f);
+    for (int i = 0; i <= 40; ++i) {
+        int x = 18 + i * 3;
+        uint16_t color = i <= lit ? (i >= 33 ? OEM_RED : OEM_AMBER) : OEM_EDGE;
+        spr.fillRect(x, 15, 2, i % 5 == 0 ? 5 : 3, color);
     }
+    spr.setFont(&lgfx::fonts::Font0);
+    spr.setTextDatum(lgfx::TC_DATUM);
+    spr.setTextColor(OEM_DIM, OEM_PANEL_2);
+    spr.drawString("RPM x1000", 80, 4);
+    spr.setTextDatum(lgfx::TL_DATUM);
 }
 
 void stockTopBar(LGFX_Sprite& spr, const VehicleState& s,
@@ -270,13 +269,13 @@ void stockTopBar(LGFX_Sprite& spr, const VehicleState& s,
     spr.setFont(&lgfx::fonts::Font0);
     spr.setTextColor(OEM_WHITE, OEM_PANEL);
     spr.setTextDatum(lgfx::TL_DATUM);
-    snprintf(text, sizeof(text), "%.1fV", s.battery_v);
-    spr.drawString(text, 6, 4);
+    spr.setTextColor(OEM_AMBER, OEM_PANEL);
+    spr.drawString("TRAIL", 6, 25);
     char heading[12];
     localizedHeadingFull(settings.language, heading, s.heading_deg);
     spr.setTextDatum(lgfx::TC_DATUM);
-    spr.setTextColor(OEM_LIME, OEM_PANEL);
-    spr.drawString(heading, 80, 4);
+    spr.setTextColor(OEM_WHITE, OEM_PANEL);
+    spr.drawString(heading, 80, 25);
     float temp = settings.use_celsius
         ? (s.engine_temp_f - 32.0f) * (5.0f / 9.0f) : s.engine_temp_f;
     snprintf(text, sizeof(text), "%d%c", static_cast<int>(temp),
@@ -284,7 +283,7 @@ void stockTopBar(LGFX_Sprite& spr, const VehicleState& s,
     spr.setTextDatum(lgfx::TR_DATUM);
     spr.setTextColor(temp >= (settings.use_celsius ? 110.0f : 230.0f)
                      ? OEM_RED : OEM_WHITE, OEM_PANEL);
-    spr.drawString(text, 153, 4);
+    spr.drawString(text, 153, 25);
     spr.setTextDatum(lgfx::TL_DATUM);
 }
 }
@@ -327,33 +326,35 @@ void SceneDashboard::_renderStockLive(const VehicleState& s, const UiFx& fx,
     _spr.setTextDatum(lgfx::MC_DATUM);
     _spr.setFont(&lgfx::fonts::Font4);
     _spr.setTextColor(OEM_WHITE, OEM_PANEL);
-    _spr.drawString(text, 57, 42);
+    _spr.drawString(text, 80, 38);
     _spr.setFont(&lgfx::fonts::Font0);
     _spr.setTextColor(OEM_DIM, OEM_PANEL);
-    _spr.drawString(_settings.use_kmh ? "KM/H" : "MPH", 57, 58);
+    _spr.drawString(_settings.use_kmh ? "KM/H" : "MPH", 80, 52);
     snprintf(text, sizeof(text), "%.1f", rpm / 1000.0f);
-    _spr.setTextColor(OEM_LIME, OEM_PANEL);
-    _spr.drawString(text, 57, 68);
+    _spr.setTextColor(OEM_AMBER, OEM_PANEL);
+    _spr.drawString(text, 80, 17);
 
     _spr.setFont(&lgfx::fonts::Font0);
-    _spr.setTextColor(OEM_DIM, OEM_PANEL_2);
-    _spr.drawString(uiText(_settings.language, "MARCIA", "GEAR"), 130, 19);
+    _spr.setTextColor(OEM_DIM, OEM_PANEL);
+    _spr.drawString(uiText(_settings.language, "MARCIA", "GEAR"), 140, 39);
     Fmt::gear(text, s.gear, false);
     _spr.setFont(&lgfx::fonts::Font4);
-    _spr.setTextColor(OEM_AMBER, OEM_PANEL_2);
-    _spr.drawString(text, 130, 36);
+    _spr.setTextColor(OEM_AMBER, OEM_PANEL);
+    _spr.drawString(text, 140, 49);
 
     int fuel = static_cast<int>(s.fuel_pct * 100.0f + 0.5f);
     if (fuel < 0) fuel = 0;
     if (fuel > 100) fuel = 100;
-    snprintf(text, sizeof(text), "%s %d%%",
-             uiText(_settings.language, "CARB", "FUEL"), fuel);
+    snprintf(text, sizeof(text), "4H %s", s.four_wd_lock ? "LOCK" : "AUTO");
     _spr.setFont(&lgfx::fonts::Font0);
-    _spr.setTextColor(fuel < 15 ? OEM_RED : OEM_WHITE, OEM_PANEL_2);
-    _spr.drawString(text, 130, 58);
-    _spr.fillRoundRect(111, 68, 38, 3, 1, OEM_EDGE);
-    _spr.fillRoundRect(111, 68, fuel * 38 / 100, 3, 1,
+    _spr.setTextColor(OEM_LIME, OEM_PANEL);
+    _spr.drawString(text, 28, 66);
+    _spr.fillRoundRect(100, 65, 42, 3, 1, OEM_EDGE);
+    _spr.fillRoundRect(100, 65, fuel * 42 / 100, 3, 1,
                        fuel < 15 ? OEM_RED : OEM_LIME);
+    snprintf(text, sizeof(text), "%d%%", fuel);
+    _spr.setTextColor(fuel < 15 ? OEM_RED : OEM_WHITE, OEM_PANEL);
+    _spr.drawString(text, 150, 66);
     _spr.setTextDatum(lgfx::TL_DATUM);
 
     if (fx.alert) {

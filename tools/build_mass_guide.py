@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Generate the concise six-page Ultra4 Microdash beta 4.1 quick guide."""
+"""Generate the concise six-page Ultra4 Microdash beta 5 quick guide."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
+import reportlab
 from reportlab.graphics import renderPDF
 from reportlab.graphics.barcode.qr import QrCodeWidget
 from reportlab.graphics.shapes import Drawing
@@ -13,6 +14,8 @@ from reportlab.lib.enums import TA_LEFT
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.utils import ImageReader
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen import canvas
 from reportlab.platypus import Paragraph
 
@@ -38,12 +41,21 @@ LIME = colors.HexColor("#CFFF45")
 AMBER = colors.HexColor("#FFC247")
 RED = colors.HexColor("#EF4438")
 
+# Embed ReportLab's redistributable Vera fonts.  The PDF then renders
+# identically even on a support computer without Helvetica/fontconfig.
+_FONT_DIR = Path(reportlab.__file__).resolve().parent / "fonts"
+pdfmetrics.registerFont(TTFont("Helvetica", str(_FONT_DIR / "Vera.ttf")))
+pdfmetrics.registerFont(TTFont("Helvetica-Bold", str(_FONT_DIR / "VeraBd.ttf")))
+pdfmetrics.registerFont(TTFont("Courier-Bold", str(_FONT_DIR / "VeraBd.ttf")))
+pdfmetrics.registerFontFamily("Helvetica", normal="Helvetica",
+                              bold="Helvetica-Bold")
+
 
 class QuickGuide:
     def __init__(self):
         OUT.parent.mkdir(parents=True, exist_ok=True)
         self.c = canvas.Canvas(str(OUT), pagesize=A4, pageCompression=1)
-        self.c.setTitle("Guida rapida Ultra4 Microdash beta 4.1")
+        self.c.setTitle("Guida rapida Ultra4 Microdash beta 5")
         self.c.setAuthor("redhorm / Codex")
         self.c.setSubject("Installazione e uso essenziale")
         self.page = 0
@@ -82,7 +94,7 @@ class QuickGuide:
         c.line(M, H - 111, W - M, H - 111)
         c.setFillColor(MUTED)
         c.setFont("Helvetica", 7)
-        c.drawString(M, 23, "ULTRA4 MICRODASH // GUIDA RAPIDA 4.1")
+        c.drawString(M, 23, "ULTRA4 MICRODASH // GUIDA RAPIDA BETA 5")
         c.drawRightString(W - M, 23, f"{self.page}/{TOTAL_PAGES}")
         return H - 134
 
@@ -153,7 +165,7 @@ class QuickGuide:
             ("HOME", "04  IL TUO RIG", ORANGE),
             ("DASH", "CLASSIC / REAL / OEM", CYAN),
             ("MEDIA", "ANTEPRIMA  100%", AMBER),
-            ("GAME", "DESERT BLITZ", MAGENTA),
+            ("GAME", "TRAIL ASSAULT", MAGENTA),
         ]
         for index, (name, value, accent) in enumerate(blocks):
             row, column = divmod(index, 2)
@@ -207,7 +219,7 @@ class QuickGuide:
                     34, 24, 5, fill=1, stroke=0)
         c.setFillColor(WHITE)
         c.setFont("Helvetica-Bold", 8)
-        c.drawString(x + 14, top - 20, "DESERT BLITZ")
+        c.drawString(x + 14, top - 20, "TRAIL ASSAULT")
         c.setFillColor(CYAN)
         c.drawRightString(x + width - 14, top - 20, "SCORE 001240")
 
@@ -271,7 +283,7 @@ def build() -> Path:
                     preserveAspectRatio=True, mask="auto")
     c.setFillColor(ORANGE)
     c.setFont("Helvetica-Bold", 10)
-    c.drawString(52, H - 76, "QUICK START // BETA 4.1")
+    c.drawString(52, H - 76, "QUICK START // BETA 5")
     c.setFillColor(WHITE)
     c.setFont("Helvetica-Bold", 31)
     c.drawString(52, H - 348, "ULTRA4 MICRODASH")
@@ -293,7 +305,7 @@ def build() -> Path:
         c.drawCentredString(x + 74, 218, label)
     c.setFillColor(colors.HexColor("#7C877E"))
     c.setFont("Helvetica", 7)
-    c.drawString(52, 42, "Firmware 4.1.0-beta.1 | ESP32-S3 DevKitC-1")
+    c.drawString(52, 42, "Firmware 5.0.0-beta.1 | ESP32-S3 DevKitC-1 N8")
     c.drawRightString(W - 52, 42, f"1/{TOTAL_PAGES}")
     guide.end()
 
@@ -304,23 +316,23 @@ def build() -> Path:
                    "Usa i connettori predisposti e non spostare fili a sistema acceso.",
                    M, y, W - 2 * M, CYAN)
     y = guide.step("2", "Collega USB-C",
-                   "Usa un cavo dati. Dopo circa 5 secondi compaiono rete e password.",
+                   "Usa un cavo dati. Al primo avvio compaiono rete e password; dopo il setup usa BOOT.",
                    M, y - 8, W - 2 * M, ORANGE)
     y = guide.step("3", "Controlla i due schermi",
                    "Entrambi devono accendersi. Se un componente scalda o senti odore, scollega subito.",
                    M, y - 8, W - 2 * M, AMBER)
     y -= 20
     guide.card(M, y, W - 2 * M, 68, "AGGIORNAMENTO - MACOS / LINUX",
-               "Non serve Homebrew.", CYAN)
+               "Non serve Homebrew. Questo comando conserva foto e boot.", CYAN)
     guide.code("python3 tools/flash_dashboard.py --flash",
                M + 15, y - 76, W - 2 * M - 30)
     y -= 140
-    guide.card(M, y, W - 2 * M, 68, "AGGIORNAMENTO - WINDOWS",
-               "Al primo utilizzo conferma l’installazione di PlatformIO.", ORANGE)
-    guide.code(r"py tools\flash_dashboard.py --flash",
+    guide.card(M, y, W - 2 * M, 68, "PRIMA INSTALLAZIONE / SCHEDA NUOVA",
+               "Inizializza la memoria foto. Attenzione: su una scheda usata cancella le foto.", ORANGE)
+    guide.code("python3 tools/flash_dashboard.py --flash --factory-init-media",
                M + 15, y - 76, W - 2 * M - 30)
-    guide.card(M, y - 142, W - 2 * M, 82, "SCHEDA NON TROVATA",
-               "Cambia cavo. Tieni premuto BOOT, premi e rilascia RESET, rilascia BOOT e ripeti il comando.", RED)
+    guide.card(M, y - 142, W - 2 * M, 82, "WINDOWS O SCHEDA NON TROVATA",
+               "Windows: usa py al posto di python3. Se la porta non appare, cambia cavo; poi BOOT + RESET e ripeti.", RED)
     guide.end()
 
     # 3 - connection and onboarding
@@ -347,33 +359,33 @@ def build() -> Path:
     guide.end()
 
     # 4 - portal, dashboard and photos
-    y = guide.header("03 / Uso", "Cinque schede, tutto a portata di pollice",
+    y = guide.header("03 / Uso", "5 schede, tutto a portata di pollice",
                      "Il menu resta fisso in basso.")
     guide.portal_visual(M, y, W - 2 * M, 205)
     y -= 224
     guide.card(M, y, 245, 108, "DASH - 3 TEMI",
-               "Classic Rally, Race Realism (pilota IQ3S-style + copilota onX-style) oppure Auto di serie OEM offroad.", CYAN)
+               "Classic Rally, Race Realism con strumento gara e trail map originali, oppure Auto di serie OEM offroad.", CYAN)
     guide.card(M + 261, y, 250, 108, "LINGUA IT / EN",
                "Un solo selettore traduce portale e due display. La preferenza resta memorizzata.", ORANGE)
     y -= 126
     guide.card(M, y, W - 2 * M, 122, "MEDIA - 4 PASSAGGI",
-               "1. Scegli JPG, JPEG, PNG o WEBP.  2. Controlla l’anteprima compatta.  3. Premi CARICA.  4. Attendi il 100%. La foto viene ottimizzata per entrambi gli schermi e resta disponibile dopo refresh e riavvio.", AMBER)
+               "1. Scegli JPG, PNG, WEBP o HEIC.  2. Controlla le due anteprime.  3. Premi CARICA.  4. Attendi il 100%. Se il browser non apre HEIC, usa JPG o PNG. La foto viene ottimizzata per entrambi gli schermi.", AMBER)
     y -= 140
     guide.card(M, y, W - 2 * M, 82, "MEMORIA LITTLEFS",
-               "Mount corretto, recupero automatico e salvataggio atomico proteggono le foto anche se il collegamento si interrompe.", CYAN)
+               "Staging, backup e recovery proteggono la coppia precedente. Il firmware valida struttura JPEG baseline e dimensioni; un file non decodificabile viene isolato.", CYAN)
     guide.end()
 
     # 5 - game and ESC/RTL
-    y = guide.header("04 / Game e luci", "DESERT BLITZ + controllo RTL",
-                     "Arcade semplice; stati ESC distinti e verificabili.")
+    y = guide.header("04 / Game e luci", "TRAIL ASSAULT + controllo RTL",
+                     "Arcade deterministico; stati ESC distinti e verificabili.")
     guide.game_visual(M, y, 300, 205)
     guide.card(M + 318, y, 193, 96, "TOUCH",
-               "Sinistra, destra e GAS. START, PAUSA e RIPRENDI.", MAGENTA, dark=True)
+               "Volante, GAS e FRENO verticali. AVVIA, PAUSA e RIPRENDI.", MAGENTA, dark=True)
     guide.card(M + 318, y - 110, 193, 95, "TASTIERA",
                "Frecce o A/D. GAS: su, W o spazio. P: pausa.", CYAN, dark=True)
     y -= 225
-    guide.card(M, y, W - 2 * M, 78, "OSTACOLI VISIBILI",
-               "Il display pilota mostra massi, tronchi e solchi. L’ESP32 gestisce vite, collisioni, punteggio e riavvio.", MAGENTA)
+    guide.card(M, y, W - 2 * M, 78, "TRE MODALITA, STESSO SEED",
+               "Crono, Corsa porte e Salita. Massi, tronchi, solchi, salti e ghost sono simulati sull’ESP32 e visibili sui display.", MAGENTA)
     y -= 98
     c.setFillColor(INK)
     c.setFont("Helvetica-Bold", 11)
@@ -381,7 +393,7 @@ def build() -> Path:
     guide.state_strip(M, y - 14, W - 2 * M)
     y -= 72
     guide.card(M, y, W - 2 * M, 92, "RTL / ESC",
-               "GPIO 4 controlla la barra WS2812. GPIO 5 legge il PWM ESC solo se abilitato. Filtro, isteresi, zona neutra e conferma reverse producono rosso in frenata e bianco soltanto in retromarcia confermata.", RED)
+               "GPIO 4 controlla la barra WS2812. GPIO 5 legge il PWM ESC solo se abilitato. Rosso = frenata; bianco = retromarcia confermata. Il TEST BOX richiede ESC fisico valido e neutro stabile per 180 ms.", RED)
     guide.end()
 
     # 6 - installer and support
@@ -391,7 +403,7 @@ def build() -> Path:
         ["SEGNALE", "DISPLAY A", "GPIO", "DISPLAY B", "GPIO"],
         ["MOSI", "SDA", "11", "SDA", "13"],
         ["SCLK", "SCL", "12", "SCL", "14"],
-        ["CS", "CS", "10", "CS", "15 / -1"],
+        ["CS", "CS", "10", "CS", "15"],
         ["DC", "A0", "9", "DC", "16"],
         ["RST", "RST", "8", "RST", "17"],
         ["BACKLIGHT", "BL", "46", "BL", "18"],

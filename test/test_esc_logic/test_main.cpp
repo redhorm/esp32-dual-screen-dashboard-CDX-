@@ -65,6 +65,60 @@ static void test_invalid_esc_signal_fails_neutral() {
     TEST_ASSERT_FLOAT_WITHIN(0.001f, 0.0f, lost.normalized);
 }
 
+static void test_asymmetric_calibration_keeps_equal_microsecond_deadband() {
+    EscSignalConfig config = testEscConfig(EscType::CRAWLER_FORWARD_REVERSE);
+    config.reverse_us = 1000;
+    config.neutral_us = 1600;
+    config.forward_us = 2000;
+    EscSignalProcessor::configureDeadbandUs(config, 60);
+
+    EscSignalProcessor forward(config);
+    TEST_ASSERT_EQUAL_INT((int)EscDriveState::NEUTRAL,
+                          (int)forward.update(1659, true, 0).state);
+    TEST_ASSERT_EQUAL_INT((int)EscDriveState::FORWARD,
+                          (int)forward.update(1660, true, 1).state);
+    TEST_ASSERT_EQUAL_INT((int)EscDriveState::FORWARD,
+                          (int)forward.update(1634, true, 2).state);
+    TEST_ASSERT_EQUAL_INT((int)EscDriveState::NEUTRAL,
+                          (int)forward.update(1632, true, 3).state);
+
+    EscSignalProcessor reverse(config);
+    TEST_ASSERT_EQUAL_INT((int)EscDriveState::NEUTRAL,
+                          (int)reverse.update(1541, true, 0).state);
+    TEST_ASSERT_EQUAL_INT((int)EscDriveState::REVERSE_ARMED,
+                          (int)reverse.update(1540, true, 1).state);
+}
+
+static void test_deadband_extremes_match_configured_microseconds() {
+    EscSignalConfig config = testEscConfig(EscType::CRAWLER_FORWARD_REVERSE);
+    config.reverse_us = 1000;
+    config.neutral_us = 1700;
+    config.forward_us = 2000;
+    EscSignalProcessor::configureDeadbandUs(config, 180);
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, 180.0f,
+        config.forward_enter_threshold * 300.0f);
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, 180.0f,
+        config.reverse_enter_threshold * 700.0f);
+
+    EscSignalProcessor forward(config);
+    TEST_ASSERT_EQUAL_INT((int)EscDriveState::NEUTRAL,
+                          (int)forward.update(1879, true, 0).state);
+    TEST_ASSERT_EQUAL_INT((int)EscDriveState::FORWARD,
+                          (int)forward.update(1881, true, 1).state);
+    EscSignalProcessor reverse(config);
+    TEST_ASSERT_EQUAL_INT((int)EscDriveState::NEUTRAL,
+                          (int)reverse.update(1521, true, 0).state);
+    TEST_ASSERT_EQUAL_INT((int)EscDriveState::REVERSE_ARMED,
+                          (int)reverse.update(1519, true, 1).state);
+
+    config.neutral_us = 1300;
+    EscSignalProcessor::configureDeadbandUs(config, 10);
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, 10.0f,
+        config.forward_enter_threshold * 700.0f);
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, 10.0f,
+        config.reverse_enter_threshold * 300.0f);
+}
+
 static void test_crawler_reverse_is_confirmed_without_fake_braking() {
     EscSignalProcessor esc(testEscConfig(EscType::CRAWLER_FORWARD_REVERSE));
     TEST_ASSERT_EQUAL_INT((int)EscDriveState::REVERSE_ARMED,
@@ -151,6 +205,8 @@ int main(int, char**) {
     RUN_TEST(test_esc_normalization_and_neutral_hysteresis);
     RUN_TEST(test_race_esc_requires_brake_release_and_reverse_confirmation);
     RUN_TEST(test_invalid_esc_signal_fails_neutral);
+    RUN_TEST(test_asymmetric_calibration_keeps_equal_microsecond_deadband);
+    RUN_TEST(test_deadband_extremes_match_configured_microseconds);
     RUN_TEST(test_crawler_reverse_is_confirmed_without_fake_braking);
     RUN_TEST(test_esc_state_machine_timers_survive_millis_wrap);
     RUN_TEST(test_rtl_maps_braking_and_reverse_to_distinct_zones);

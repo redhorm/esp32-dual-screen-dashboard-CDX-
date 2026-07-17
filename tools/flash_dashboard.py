@@ -25,7 +25,7 @@ from pathlib import Path
 from typing import Any, Iterable, Optional, Sequence
 
 
-SCRIPT_VERSION = "1.0.0"
+SCRIPT_VERSION = "1.1.0"
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 PLATFORMIO_INI = PROJECT_ROOT / "platformio.ini"
 LOCAL_PIO_VENV = PROJECT_ROOT / ".tools" / "platformio-venv"
@@ -604,6 +604,27 @@ def flash_firmware(
         ui.ok("FLASH COMPLETATO: la dashboard si riavviera automaticamente.")
 
 
+def initialize_factory_media(
+    pio: Sequence[str], config: ProjectConfig, port: str, dry_run: bool, ui: Ui
+) -> None:
+    """Create LittleFS only during explicit first/factory provisioning."""
+    argv = [
+        *pio,
+        "run",
+        "--environment",
+        config.environment,
+        "--target",
+        "uploadfs",
+        "--upload-port",
+        port,
+    ]
+    run_phase("INIZIALIZZAZIONE MEDIA DI FABBRICA", argv, "flash", dry_run, ui)
+    if dry_run:
+        ui.ok("Simulazione: la partizione foto non e stata modificata.")
+    else:
+        ui.ok("LittleFS inizializzata. MEDIA e pronta per foto e boot image.")
+
+
 def open_monitor(
     pio: Sequence[str], config: ProjectConfig, port: str, dry_run: bool, ui: Ui
 ) -> None:
@@ -653,13 +674,14 @@ def interactive_menu(ui: Ui) -> str:
     print("  2. Prepara soltanto il firmware")
     print("  3. Controlla PC, progetto e collegamento USB")
     print("  4. Apri il monitor diagnostico")
+    print("  5. Prima installazione di fabbrica  (CANCELLA tutte le foto)")
     print("  0. Esci")
     while True:
         answer = input("Scelta: ").strip()
-        choices = {"1": "flash", "2": "build", "3": "check", "4": "monitor", "0": "exit"}
+        choices = {"1": "flash", "2": "build", "3": "check", "4": "monitor", "5": "factory-flash", "0": "exit"}
         if answer in choices:
             return choices[answer]
-        ui.warn("Scegli 0, 1, 2, 3 oppure 4.")
+        ui.warn("Scegli 0, 1, 2, 3, 4 oppure 5.")
 
 
 def parser_for_cli() -> argparse.ArgumentParser:
@@ -678,6 +700,7 @@ Esempi:
   python3 tools/flash_dashboard.py --flash --port /dev/cu.usbmodem101
   py tools\\flash_dashboard.py --flash --port COM5
   python3 tools/flash_dashboard.py --flash --monitor
+  python3 tools/flash_dashboard.py --flash --factory-init-media --yes
   python3 tools/flash_dashboard.py --dry-run --flash --port PORTA_TEST
 """
     parser = argparse.ArgumentParser(
@@ -689,6 +712,11 @@ Esempi:
     actions.add_argument("--check", action="store_true", help="controlla requisiti e porte USB")
     actions.add_argument("--build", action="store_true", help="compila il firmware senza installarlo")
     actions.add_argument("--flash", action="store_true", help="compila e installa il firmware sulla scheda")
+    actions.add_argument(
+        "--factory-init-media",
+        action="store_true",
+        help="inizializza LittleFS e CANCELLA foto/boot esistenti; solo per schede nuove",
+    )
     actions.add_argument("--monitor", action="store_true", help="apre il monitor seriale (anche dopo --flash)")
     actions.add_argument(
         "--install-platformio",
@@ -718,7 +746,7 @@ def print_banner(ui: Ui, config: ProjectConfig) -> None:
     print(ui._paint("=" * 62, "1;36"))
     print(f"  Scheda: {config.board}")
     print(f"  Profilo: {config.environment}")
-    print("  Il firmware originale non viene modificato.")
+    print("  Foto e boot restano intatti salvo --factory-init-media.")
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
@@ -733,7 +761,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         pio = find_platformio()
 
         has_explicit_action = any(
-            (args.check, args.build, args.flash, args.monitor, args.install_platformio)
+            (args.check, args.build, args.flash, args.monitor,
+             args.factory_init_media, args.install_platformio)
         )
         interactive = not has_explicit_action
         if interactive and not sys.stdin.isatty():
@@ -786,8 +815,16 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             return 0
 
         do_check = args.check or action == "check"
-        do_build = args.build or args.flash or action in ("build", "flash")
-        do_flash = args.flash or action == "flash"
+        factory_init_media = args.factory_init_media or action == "factory-flash"
+        if args.factory_init_media and not args.flash:
+            raise AssistantError(
+                "--factory-init-media richiede anche --flash. Questa operazione "
+                "cancella in modo esplicito tutte le foto presenti."
+            )
+        do_build = args.build or args.flash or action in (
+            "build", "flash", "factory-flash"
+        )
+        do_flash = args.flash or action in ("flash", "factory-flash")
         do_monitor = args.monitor or action == "monitor"
 
         if do_check:
@@ -822,6 +859,19 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         if do_flash:
             assert port is not None
             flash_firmware(pio, config, port, args.dry_run, ui)
+            if factory_init_media:
+                confirmed = args.yes or args.dry_run or ask_yes_no(
+                    "ATTENZIONE: inizializzare MEDIA cancella definitivamente "
+                    "foto, boot image e galleria. Continuare?",
+                    default=False,
+                )
+                if not confirmed:
+                    raise AssistantError(
+                        "Firmware installato; MEDIA non inizializzata e foto preservate."
+                    )
+                initialize_factory_media(
+                    pio, config, port, args.dry_run, ui
+                )
             if interactive and not do_monitor:
                 do_monitor = ask_yes_no("Vuoi aprire il monitor diagnostico?", default=False)
         if do_monitor:

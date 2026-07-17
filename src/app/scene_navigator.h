@@ -16,7 +16,8 @@
 class SceneNavigator {
 public:
     SceneNavigator(lgfx::LGFX_Device& disp, const Roadbook& rb);
-    void init();
+    bool init();
+    bool ready() const { return _ready; }
     void setSettings(const UiSettings& settings) { _settings = settings; }
     void setExperienceFrame(const ExperienceFrame& frame) { _experience = frame; }
     void setPortalCredentials(bool visible, const char* ssid,
@@ -36,6 +37,7 @@ private:
     bool                _portalCredentialsVisible = false;
     char                _portalSsid[24] = "";
     char                _portalPassword[16] = "";
+    bool                _ready = false;
 
     // Display-value smoothing / scroll animation (core logic)
     SlideAnim _scroll;   // roadbook slides between waypoints, never snaps
@@ -52,8 +54,8 @@ private:
     void _renderStockBoot(const UiFx& fx);
     void _renderStockLive(const VehicleState& s, const UiFx& fx);
     void _renderStockFinish(const UiFx& fx, const RunStats& stats);
-    void _drawThemedRow(int y, const Waypoint& wp, bool active, bool alert_on);
     bool _renderExperienceTakeover(const UiFx& fx);
+    void _drawThemedRow(int y, const Waypoint& wp, bool active, bool alert_on);
     void _renderPortalCredentials();
 
     // Live-frame building blocks

@@ -53,14 +53,14 @@ void EscPwmInput::end() {
 }
 
 void EscPwmInput::resetFilter() {
-    noInterrupts();
+    portENTER_CRITICAL(&_capture_mux);
     _rise_us = 0;
     _last_valid_us = 0;
     _pulse_us = 0;
     _filtered_us = 0;
     _rise_seen = false;
     _sample_seen = false;
-    interrupts();
+    portEXIT_CRITICAL(&_capture_mux);
     _processor.reset(millis());
 }
 
@@ -84,12 +84,12 @@ EscPwmSample EscPwmInput::sample() {
     uint16_t pulse_us;
     uint16_t filtered_us;
     bool sample_seen;
-    noInterrupts();
+    portENTER_CRITICAL(&_capture_mux);
     last_valid_us = _last_valid_us;
     pulse_us = _pulse_us;
     filtered_us = _filtered_us;
     sample_seen = _sample_seen;
-    interrupts();
+    portEXIT_CRITICAL(&_capture_mux);
 
     if (!sample_seen) return out;
     const uint32_t age_us = static_cast<uint32_t>(micros() - last_valid_us);
@@ -117,16 +117,25 @@ void IRAM_ATTR EscPwmInput::isrThunk() {
 
 void IRAM_ATTR EscPwmInput::handleEdge() {
     const uint32_t now_us = micros();
-    if (digitalRead(ESC_PWM_SIGNAL_PIN) == HIGH) {
+    const bool high = digitalRead(ESC_PWM_SIGNAL_PIN) == HIGH;
+    portENTER_CRITICAL_ISR(&_capture_mux);
+    if (high) {
         _rise_us = now_us;
         _rise_seen = true;
+        portEXIT_CRITICAL_ISR(&_capture_mux);
         return;
     }
 
-    if (!_rise_seen) return;
+    if (!_rise_seen) {
+        portEXIT_CRITICAL_ISR(&_capture_mux);
+        return;
+    }
     _rise_seen = false;
     const uint32_t width_us = static_cast<uint32_t>(now_us - _rise_us);
-    if (!validPulseWidth(width_us)) return;
+    if (!validPulseWidth(width_us)) {
+        portEXIT_CRITICAL_ISR(&_capture_mux);
+        return;
+    }
 
     const uint16_t width = static_cast<uint16_t>(width_us);
     _pulse_us = width;
@@ -139,6 +148,7 @@ void IRAM_ATTR EscPwmInput::handleEdge() {
             (static_cast<uint32_t>(_filtered_us) * 3U + width + 2U) / 4U);
     }
     _last_valid_us = now_us;
+    portEXIT_CRITICAL_ISR(&_capture_mux);
 }
 
 #endif  // NATIVE_BUILD

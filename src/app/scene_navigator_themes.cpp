@@ -8,7 +8,7 @@
 #include "config.h"
 
 // REALISM / navigator display
-// Full-bleed onX Offroad-inspired topographic map, built only from LovyanGFX
+// Original full-bleed topographic trail map, built only from LovyanGFX
 // primitives.  No bitmap, heap allocation or network map tile is required.
 namespace {
 constexpr uint16_t rgbn(uint8_t r, uint8_t g, uint8_t b) {
@@ -34,14 +34,14 @@ constexpr uint16_t INK          = rgbn(28, 31, 30);
 constexpr uint16_t DIM          = rgbn(93, 99, 95);
 constexpr uint16_t CARD         = rgbn(252, 252, 250);
 constexpr uint16_t SHADOW       = rgbn(83, 80, 72);
-constexpr uint16_t ONX_YELLOW   = rgbn(255, 205, 0);
+constexpr uint16_t MAP_YELLOW   = rgbn(255, 205, 0);
 constexpr uint16_t WHITE        = 0xFFFF;
 
 struct Pt { int16_t x; int16_t y; };
 
 constexpr Pt ROUTE_PTS[] = {
-    {24, 232}, {44, 209}, {63, 196}, {68, 174}, {93, 157},
-    {112, 133}, {132, 112}, {145, 84}, {171, 66}, {190, 39}, {217, 20}
+    {24, 158}, {44, 150}, {63, 142}, {68, 130}, {93, 116},
+    {112, 101}, {132, 87}, {145, 68}, {171, 53}, {190, 36}, {217, 20}
 };
 constexpr Pt OPEN_SPUR[] = {
     {9, 145}, {35, 139}, {56, 122}, {80, 119}, {112, 133},
@@ -57,9 +57,12 @@ constexpr Pt WASH_PTS[] = {
 
 void path(LGFX_Sprite& spr, const Pt* pts, int count, float radius,
           uint16_t color) {
-    for (int i = 1; i < count; ++i)
-        spr.drawWideLine(pts[i - 1].x, pts[i - 1].y,
-                         pts[i].x, pts[i].y, radius, color);
+    int thickness = radius >= 2.0f ? 3 : 1;
+    for (int i = 1; i < count; ++i) {
+        for (int offset = -(thickness / 2); offset <= thickness / 2; ++offset)
+            spr.drawLine(pts[i - 1].x + offset, pts[i - 1].y,
+                         pts[i].x + offset, pts[i].y, color);
+    }
 }
 
 void dashedPath(LGFX_Sprite& spr, const Pt* pts, int count, float radius,
@@ -70,11 +73,13 @@ void dashedPath(LGFX_Sprite& spr, const Pt* pts, int count, float radius,
         for (int part = 0; part < 4; part += 2) {
             float a = part * 0.25f;
             float b = (part + 1) * 0.25f;
-            spr.drawWideLine(static_cast<int>(x0 + (x1 - x0) * a),
-                             static_cast<int>(y0 + (y1 - y0) * a),
-                             static_cast<int>(x0 + (x1 - x0) * b),
-                             static_cast<int>(y0 + (y1 - y0) * b),
-                             radius, color);
+            int ax = static_cast<int>(x0 + (x1 - x0) * a);
+            int ay = static_cast<int>(y0 + (y1 - y0) * a);
+            int bx = static_cast<int>(x0 + (x1 - x0) * b);
+            int by = static_cast<int>(y0 + (y1 - y0) * b);
+            int thickness = radius >= 2.0f ? 3 : 1;
+            for (int offset = -(thickness / 2); offset <= thickness / 2; ++offset)
+                spr.drawLine(ax + offset, ay, bx + offset, by, color);
         }
     }
 }
@@ -103,79 +108,90 @@ void topoBase(LGFX_Sprite& spr, UiLanguage language) {
     spr.fillTriangle(42, 68, 147, 22, 175, 120, MAP_GREEN_2);
     spr.fillTriangle(42, 68, 175, 120, 75, 158, MAP_GREEN_2);
 
-    // Layered contour rings give convincing elevation without tile assets.
-    for (int r = 22; r <= 108; r += 14)
-        spr.drawEllipse(26, 30, r, static_cast<int>(r * 0.62f),
-                        (r / 14) & 1 ? CONTOUR : CONTOUR_SOFT);
-    for (int r = 19; r <= 103; r += 14)
-        spr.drawEllipse(198, 168, r, static_cast<int>(r * 0.72f),
-                        (r / 14) & 1 ? CONTOUR_SOFT : CONTOUR);
-    for (int r = 25; r <= 81; r += 14)
-        spr.drawEllipse(91, 210, r, static_cast<int>(r * 0.48f), CONTOUR);
-    for (int x = 18; x < 235; x += 36)
-        spr.drawFastVLine(x, 0, 240, CONTOUR_SOFT);
+    // Precomputed contour polylines replace large clipped ellipses. On the
+    // ESP32 those ellipses dominated the whole frame (~380 ms); this version
+    // retains the map character with a bounded number of cheap line draws.
+    constexpr Pt topo_contours[][8] = {
+        {{0,31},{27,19},{54,25},{79,42},{111,37},{145,20},{181,25},{239,17}},
+        {{0,54},{29,41},{58,48},{84,64},{116,59},{150,42},{184,48},{239,40}},
+        {{0,80},{31,67},{62,73},{89,91},{122,84},{157,67},{192,74},{239,65}},
+        {{0,109},{29,96},{59,102},{91,120},{127,113},{161,95},{197,102},{239,94}},
+        {{0,139},{32,126},{64,133},{97,151},{132,144},{167,126},{203,134},{239,126}},
+        {{0,170},{29,158},{62,164},{96,183},{132,176},{169,157},{204,165},{239,157}},
+        {{0,201},{31,190},{65,196},{99,215},{135,208},{171,189},{207,197},{239,190}},
+        {{0,228},{35,218},{70,224},{105,238},{140,232},{177,215},{211,222},{239,216}}
+    };
+    for (int row = 0; row < 8; row += 2)
+        for (int i = 1; i < 8; ++i)
+            spr.drawLine(topo_contours[row][i - 1].x,
+                         topo_contours[row][i - 1].y,
+                         topo_contours[row][i].x,
+                         topo_contours[row][i].y,
+                         row & 1 ? CONTOUR : CONTOUR_SOFT);
 
-    // Dry wash and minor access roads.
-    path(spr, WASH_PTS, sizeof(WASH_PTS) / sizeof(WASH_PTS[0]), 4.0f, WASH);
-    path(spr, WASH_PTS, sizeof(WASH_PTS) / sizeof(WASH_PTS[0]), 1.0f,
-         MAP_LIGHT);
-    spr.drawWideLine(0, 186, 238, 112, 1.8f, TRAIL_EDGE);
-    spr.drawWideLine(0, 186, 238, 112, 0.8f, MINOR_ROAD);
-    spr.drawWideLine(18, 18, 225, 216, 1.5f, TRAIL_EDGE);
-    spr.drawWideLine(18, 18, 225, 216, 0.6f, MINOR_ROAD);
-
-    // Official open trail and a clearly closed spur.
-    path(spr, OPEN_SPUR, sizeof(OPEN_SPUR) / sizeof(OPEN_SPUR[0]),
-         2.8f, TRAIL_EDGE);
-    path(spr, OPEN_SPUR, sizeof(OPEN_SPUR) / sizeof(OPEN_SPUR[0]),
-         1.5f, TRAIL_OPEN);
-    dashedPath(spr, CLOSED_SPUR,
-               sizeof(CLOSED_SPUR) / sizeof(CLOSED_SPUR[0]),
-               2.8f, TRAIL_EDGE);
-    dashedPath(spr, CLOSED_SPUR,
-               sizeof(CLOSED_SPUR) / sizeof(CLOSED_SPUR[0]),
-               1.5f, TRAIL_CLOSE);
+    // Two inexpensive access roads provide enough geographic context at
+    // 240 px; secondary washes/spurs are intentionally omitted in live view.
+    spr.drawLine(0, 186, 238, 112, MINOR_ROAD);
+    spr.drawLine(18, 18, 225, 216, MINOR_ROAD);
 
     // Active trail: the outlined route stays above every map layer.
     path(spr, ROUTE_PTS, sizeof(ROUTE_PTS) / sizeof(ROUTE_PTS[0]),
-         4.2f, TRAIL_EDGE);
-    path(spr, ROUTE_PTS, sizeof(ROUTE_PTS) / sizeof(ROUTE_PTS[0]),
-         2.7f, ROUTE_DARK);
+         2.2f, TRAIL_EDGE);
     path(spr, ROUTE_PTS, sizeof(ROUTE_PTS) / sizeof(ROUTE_PTS[0]),
          1.7f, ROUTE);
 
     spr.setFont(&lgfx::fonts::Font0);
     spr.setTextColor(INK);
     spr.drawString("ROCK CREEK", 87, 91);
-    spr.setTextColor(TRAIL_OPEN);
-    spr.drawString(uiText(language, "APERTA", "OPEN"), 154, 144);
-    spr.setTextColor(TRAIL_CLOSE);
-    spr.drawString(uiText(language, "CHIUSA", "CLOSED"), 184, 94);
-    spr.drawLine(215, 83, 223, 91, TRAIL_CLOSE);
-    spr.drawLine(223, 83, 215, 91, TRAIL_CLOSE);
+    (void)language;
+}
 
-    // Map POI pins.
-    constexpr Pt poi[] = {{52, 181}, {144, 84}, {206, 127}};
-    for (const auto& p : poi) {
-        spr.fillSmoothCircle(p.x, p.y, 5, WHITE);
-        spr.fillSmoothCircle(p.x, p.y, 3, ONX_YELLOW);
-        spr.drawFastVLine(p.x, p.y + 4, 5, INK);
+void topoLiveBase(LGFX_Sprite& spr) {
+    // Live-only map layer: every primitive earns its place in the 33 ms
+    // budget. Full decorative cartography remains available on boot/finish.
+    spr.fillScreen(MAP_SAND);
+    spr.fillTriangle(0, 0, 126, 0, 0, 132, MAP_GREEN);
+    spr.fillTriangle(240, 240, 112, 240, 240, 108, MAP_GREEN_2);
+    constexpr Pt contours[][7] = {
+        {{0,54},{36,42},{72,51},{108,68},{145,57},{184,42},{239,49}},
+        {{0,157},{37,145},{74,154},{112,172},{150,161},{190,145},{239,153}}
+    };
+    for (const auto& contour : contours)
+        for (int i = 1; i < 7; ++i)
+            spr.drawLine(contour[i-1].x, contour[i-1].y,
+                         contour[i].x, contour[i].y, CONTOUR);
+    // Single-pixel high-contrast route, without AA/wide-line rasterization.
+    constexpr int route_count = sizeof(ROUTE_PTS) / sizeof(ROUTE_PTS[0]);
+    for (int i = 1; i < route_count; ++i) {
+        spr.drawLine(ROUTE_PTS[i-1].x, ROUTE_PTS[i-1].y,
+                     ROUTE_PTS[i].x, ROUTE_PTS[i].y, ROUTE);
     }
 }
 
 void logoPill(LGFX_Sprite& spr) {
     spr.fillRoundRect(6, 6, 96, 27, 13, INK);
-    // Use only guaranteed built-in uppercase glyphs.  The previous lowercase
-    // `on` was absent from the reduced device font, leaving a lone X.
     spr.setTextDatum(lgfx::MC_DATUM);
     spr.setFont(&lgfx::fonts::Font2);
-    spr.setTextColor(ONX_YELLOW, INK);
-    spr.drawString("ON", 25, 19);
-    spr.drawString("X", 43, 19);
+    spr.setTextColor(MAP_YELLOW, INK);
+    spr.drawString("U4", 24, 19);
     spr.setFont(&lgfx::fonts::Font0);
     spr.setTextColor(WHITE, INK);
-    spr.drawString("OFFROAD", 72, 19);
+    spr.drawString("TRAIL MAP", 66, 19);
     spr.setTextDatum(lgfx::TL_DATUM);
+}
+
+void nextTurnIcon(LGFX_Sprite& spr, WaypointDir dir, int x, int y,
+                  uint16_t color) {
+    int dx = 0;
+    if (dir == WaypointDir::RIGHT_45 || dir == WaypointDir::RIGHT_90 ||
+        dir == WaypointDir::HAIRPIN_R) dx = 8;
+    if (dir == WaypointDir::LEFT_45 || dir == WaypointDir::LEFT_90 ||
+        dir == WaypointDir::HAIRPIN_L) dx = -8;
+    spr.drawLine(x, y + 6, x, y - 4, color);
+    spr.drawLine(x + 1, y + 6, x + 1, y - 4, color);
+    spr.drawLine(x, y - 4, x + dx, y - 10, color);
+    spr.fillTriangle(x + dx, y - 12, x + dx - 3, y - 7,
+                     x + dx + 3, y - 7, color);
 }
 
 void basemapPill(LGFX_Sprite& spr) {
@@ -189,8 +205,8 @@ void basemapPill(LGFX_Sprite& spr) {
 }
 
 void compass(LGFX_Sprite& spr, float heading) {
-    spr.fillSmoothCircle(218, 24, 18, SHADOW);
-    spr.fillSmoothCircle(217, 23, 18, CARD);
+    spr.fillCircle(218, 24, 18, SHADOW);
+    spr.fillCircle(217, 23, 18, CARD);
     spr.drawCircle(217, 23, 17, rgbn(205, 205, 201));
     spr.setTextDatum(lgfx::TC_DATUM);
     spr.setFont(&lgfx::fonts::Font0);
@@ -199,7 +215,8 @@ void compass(LGFX_Sprite& spr, float heading) {
     float a = heading * 0.0174532925f;
     int dx = static_cast<int>(sinf(a) * 11.0f);
     int dy = static_cast<int>(-cosf(a) * 11.0f);
-    spr.drawWideLine(217, 23, 217 + dx, 23 + dy, 1.5f, ROUTE);
+    spr.drawLine(217, 23, 217 + dx, 23 + dy, ROUTE);
+    spr.drawLine(218, 23, 218 + dx, 23 + dy, ROUTE);
     spr.fillTriangle(217 + dx, 23 + dy,
                      214 + dx / 2, 24 + dy / 2,
                      220 + dx / 2, 24 + dy / 2, ROUTE);
@@ -233,9 +250,9 @@ void positionMarker(LGFX_Sprite& spr, int x, int y, float heading) {
                      y + static_cast<int>(py * 10.0f),
                      x - static_cast<int>(px * 10.0f),
                      y - static_cast<int>(py * 10.0f), BLUE_FAN);
-    spr.fillSmoothCircle(x, y, 9, WHITE);
-    spr.fillSmoothCircle(x, y, 6, BLUE);
-    spr.fillSmoothCircle(x - 2, y - 2, 2, WHITE);
+    spr.fillCircle(x, y, 9, WHITE);
+    spr.fillCircle(x, y, 6, BLUE);
+    spr.fillCircle(x - 2, y - 2, 2, WHITE);
 }
 }
 
@@ -247,12 +264,11 @@ void SceneNavigator::_renderThemedBoot(const UiFx& fx) {
 
     _spr.setTextDatum(lgfx::MC_DATUM);
     _spr.setFont(&lgfx::fonts::Font4);
-    _spr.setTextColor(ONX_YELLOW, INK);
-    _spr.drawString("ON", 67, 98);
-    _spr.drawString("X", 101, 98);
+    _spr.setTextColor(MAP_YELLOW, INK);
+    _spr.drawString("ULTRA4", 78, 98);
     _spr.setFont(&_fonts.med);
     _spr.setTextColor(WHITE, INK);
-    _spr.drawString("OFFROAD", 145, 100);
+    _spr.drawString("TRAIL MAP", 151, 100);
     _spr.setFont(&_fonts.small);
     _spr.setTextColor(rgbn(190, 193, 190), INK);
     _spr.drawString(uiText(_settings.language,
@@ -260,13 +276,13 @@ void SceneNavigator::_renderThemedBoot(const UiFx& fx) {
                            "OFFLINE MAPS / GPS ACQUIRING"), 118, 130);
     _spr.fillRoundRect(43, 145, 150, 5, 2, rgbn(63, 67, 65));
     _spr.fillRoundRect(43, 145, static_cast<int>(150.0f * q), 5, 2,
-                       ONX_YELLOW);
+                       MAP_YELLOW);
     _spr.setTextDatum(lgfx::TL_DATUM);
 }
 
 void SceneNavigator::_renderThemedLive(const VehicleState& s,
                                        const UiFx& fx) {
-    topoBase(_spr, _settings.language);
+    topoLiveBase(_spr);
 
     float total = _rb.stageTotal();
     float progress = total > 0.0f ? s.odo_mi / total : 0.0f;
@@ -274,17 +290,27 @@ void SceneNavigator::_renderThemedLive(const VehicleState& s,
     routePoint(progress, px, py);
     positionMarker(_spr, px, py, s.heading_deg);
 
-    logoPill(_spr);
-    basemapPill(_spr);
-    compass(_spr, s.heading_deg);
-    toolbar(_spr);
+    // Compact top status replaces four decorative widgets during live drive.
+    _spr.fillRoundRect(6, 6, 228, 27, 7, INK);
+    _spr.setFont(&lgfx::fonts::Font0);
+    _spr.setTextColor(MAP_YELLOW, INK);
+    _spr.drawString("U4 TRAIL", 14, 15);
+    char live_heading[12];
+    localizedHeadingFull(_settings.language, live_heading, s.heading_deg);
+    _spr.setTextDatum(lgfx::TR_DATUM);
+    _spr.setTextColor(WHITE, INK);
+    _spr.drawString(live_heading, 226, 15);
+    _spr.setTextDatum(lgfx::TL_DATUM);
 
     int active = s.active_wp;
     if (active < 0) active = 0;
     if (active >= _rb.getCount()) active = _rb.getCount() - 1;
-    const Waypoint& wp = _rb.get(active);
+    int target = active < _rb.getCount() - 1 ? active + 1 : active;
+    if (fx.alert && fx.alert_wp >= 0 && fx.alert_wp < _rb.getCount())
+        target = fx.alert_wp;
+    const Waypoint& wp = _rb.get(target);
 
-    // onX-style bottom route card: real simulator heading, distance, speed and WP.
+    // Bottom route card: next maneuver, matching distance, speed and heading.
     _spr.fillRoundRect(7, 185, 228, 52, 10, SHADOW);
     _spr.fillRoundRect(6, 183, 228, 52, 10, CARD);
     _spr.fillRoundRect(101, 187, 38, 3, 2, rgbn(196, 198, 194));
@@ -296,6 +322,8 @@ void SceneNavigator::_renderThemedLive(const VehicleState& s,
     _spr.drawString(wp.danger
                     ? uiText(_settings.language, "ATTENZ", "CAUTION")
                     : uiText(_settings.language, "APERTA", "OPEN"), 39, 198);
+    nextTurnIcon(_spr, wp.dir, 82, 202,
+                 wp.danger ? TRAIL_CLOSE : ROUTE);
 
     char buf[22];
     _spr.setTextDatum(lgfx::TL_DATUM);
@@ -389,12 +417,45 @@ void stockNavBase(LGFX_Sprite& spr) {
     spr.fillScreen(SN_BG);
     spr.fillRoundRect(2, 2, 236, 236, 13, SN_PANEL);
     spr.drawRoundRect(2, 2, 236, 236, 13, SN_EDGE);
-    spr.drawFastHLine(12, 27, 216, SN_EDGE);
-    spr.drawFastHLine(12, 193, 216, SN_EDGE);
-    spr.fillRoundRect(6, 57, 36, 113, 8, SN_PANEL_2);
-    spr.fillRoundRect(198, 57, 36, 113, 8, SN_PANEL_2);
-    spr.drawRoundRect(6, 57, 36, 113, 8, SN_EDGE);
-    spr.drawRoundRect(198, 57, 36, 113, 8, SN_EDGE);
+    spr.fillRoundRect(7, 7, 226, 38, 7, SN_PANEL_2);
+    spr.fillRoundRect(7, 201, 226, 32, 7, SN_PANEL_2);
+    spr.drawFastHLine(12, 48, 216, SN_EDGE);
+    spr.drawFastHLine(12, 197, 216, SN_EDGE);
+}
+
+void stockTrailMap(LGFX_Sprite& spr, float progress) {
+    // Fixed contour polylines. Large clipped ellipses took hundreds of ms on
+    // the ESP32; these few straight segments preserve the topo language while
+    // rendering in a small, deterministic fraction of a frame.
+    constexpr Pt contours[][7] = {
+        {{8,66},{36,54},{68,58},{95,72},{126,68},{162,55},{228,61}},
+        {{8,82},{37,70},{71,75},{98,89},{130,84},{169,70},{232,76}},
+        {{8,103},{39,91},{71,96},{101,111},{136,104},{174,90},{232,96}},
+        {{8,127},{34,116},{65,120},{99,137},{137,129},{176,115},{232,121}},
+        {{8,151},{39,140},{70,145},{104,161},{141,154},{179,140},{232,146}},
+        {{8,177},{35,166},{67,171},{102,188},{139,180},{179,165},{232,172}}
+    };
+    for (const auto& contour : contours)
+        for (int i = 1; i < 7; ++i)
+            spr.drawLine(contour[i-1].x, contour[i-1].y,
+                         contour[i].x, contour[i].y, SN_EDGE);
+    constexpr Pt route[] = {{50,184},{70,166},{91,151},{84,130},{113,111},
+                            {141,94},{134,73},{165,56},{190,52}};
+    for (int i = 1; i < 9; ++i) {
+        for (int offset = -2; offset <= 2; ++offset)
+            spr.drawLine(route[i-1].x + offset, route[i-1].y,
+                         route[i].x + offset, route[i].y,
+                         offset == 0 ? SN_WHITE : SN_AMBER);
+    }
+    int at = static_cast<int>(progress * 7.9f);
+    if (at < 0) at = 0;
+    if (at > 7) at = 7;
+    float f = progress * 7.9f - at;
+    int x = route[at].x + static_cast<int>((route[at+1].x-route[at].x)*f);
+    int y = route[at].y + static_cast<int>((route[at+1].y-route[at].y)*f);
+    spr.fillCircle(x, y, 10, SN_WHITE);
+    spr.fillCircle(x, y, 7, SN_BG);
+    spr.fillTriangle(x, y-7, x-5, y+6, x+5, y+6, rgbn(64, 145, 238));
 }
 
 void stockNavArc(LGFX_Sprite& spr, float rpm) {
@@ -454,12 +515,11 @@ void SceneNavigator::_renderStockBoot(const UiFx& fx) {
     _spr.setTextDatum(lgfx::MC_DATUM);
     _spr.setFont(&_fonts.med);
     _spr.setTextColor(SN_WHITE, SN_PANEL);
-    _spr.drawString(uiText(_settings.language, "AUTO DI SERIE",
-                           "STOCK OFFROAD"), 120, 163);
+    _spr.drawString("TRAIL COMMAND", 120, 163);
     _spr.setFont(&_fonts.small);
     _spr.setTextColor(SN_AMBER, SN_PANEL);
-    _spr.drawString(uiText(_settings.language, "CONTROLLO SISTEMI 4X4",
-                           "4X4 SYSTEM CHECK"), 120, 184);
+    _spr.drawString(uiText(_settings.language, "NAVIGAZIONE PRONTA",
+                           "NAVIGATION READY"), 120, 184);
     _spr.fillRoundRect(45, 207, 150, 5, 2, SN_EDGE);
     _spr.fillRoundRect(45, 207, static_cast<int>(150.0f * q), 5, 2, SN_LIME);
     _spr.setTextDatum(lgfx::TL_DATUM);
@@ -467,12 +527,56 @@ void SceneNavigator::_renderStockBoot(const UiFx& fx) {
 
 void SceneNavigator::_renderStockLive(const VehicleState& s, const UiFx& fx) {
     stockNavBase(_spr);
+    {
     float speed = _spdF.update(s.speed_mph, fx.now_ms,
                                NAV_VALUE_SMOOTH_MS, NAV_VALUE_SMOOTH_MS);
-    stockNavArc(_spr, s.rpm);
+    const float progress = fmodf(s.odo_mi * 3.7f, 1.0f);
+    stockTrailMap(_spr, progress < 0.0f ? progress + 1.0f : progress);
+
+    char trail_text[22];
+    _spr.setTextDatum(lgfx::TC_DATUM);
+    _spr.setFont(&_fonts.med);
+    _spr.setTextColor(SN_AMBER, SN_PANEL_2);
+    _spr.drawString("NEXT", 43, 11);
+    _spr.setTextColor(SN_WHITE, SN_PANEL_2);
+    _spr.drawString("2.4", 43, 25);
+    _spr.setTextColor(SN_AMBER, SN_PANEL_2);
+    _spr.drawString("TRAIL", 120, 11);
+    char heading[12];
+    localizedHeadingFull(_settings.language, heading, s.heading_deg);
+    _spr.setTextColor(SN_WHITE, SN_PANEL_2);
+    _spr.drawString(heading, 120, 25);
+    _spr.setTextColor(SN_AMBER, SN_PANEL_2);
+    _spr.drawString("ALT", 198, 11);
+    snprintf(trail_text, sizeof(trail_text), "%dm", static_cast<int>(900.0f + s.odo_mi * 8.0f));
+    _spr.setTextColor(SN_WHITE, SN_PANEL_2);
+    _spr.drawString(trail_text, 198, 25);
+
+    Fmt::speed(trail_text, speed, _settings.use_kmh);
+    _spr.setFont(&_fonts.med);
+    _spr.setTextColor(SN_WHITE, SN_PANEL_2);
+    _spr.drawString(trail_text, 38, 211);
+    _spr.setFont(&_fonts.small);
+    _spr.setTextColor(SN_DIM, SN_PANEL_2);
+    _spr.drawString(_settings.use_kmh ? "KM/H" : "MPH", 38, 224);
+    _spr.setTextColor(SN_LIME, SN_PANEL_2);
+    _spr.drawString(s.four_wd_lock ? "4H LOCK" : "4H AUTO", 120, 214);
+    snprintf(trail_text, sizeof(trail_text), "%.1fV", s.battery_v);
+    _spr.setTextColor(SN_WHITE, SN_PANEL_2);
+    _spr.drawString(trail_text, 198, 214);
+    _spr.setTextDatum(lgfx::TL_DATUM);
+
+    if (fx.alert) {
+        uint16_t border = Anim::pulse(fx.now_ms, ALERT_PULSE_MS) ? SN_RED : SN_AMBER;
+        _spr.drawRoundRect(2, 2, 236, 236, 13, border);
+    }
+    return;
+    }
 
     // OEM top bar: voltage, heading and temperature.
     char text[28];
+    float speed = _spdF.update(s.speed_mph, fx.now_ms,
+                               NAV_VALUE_SMOOTH_MS, NAV_VALUE_SMOOTH_MS);
     _spr.setFont(&_fonts.small);
     _spr.setTextColor(SN_WHITE, SN_PANEL);
     _spr.setTextDatum(lgfx::TL_DATUM);

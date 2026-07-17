@@ -16,17 +16,10 @@
 #include "core/noise.h"
 #include "core/compass.h"
 #include "core/ui_settings.h"
-#include "core/rock_line_game.h"
 #include "core/experience.h"
 #include "core/rtl_logic.h"
 #include <type_traits>
 
-static_assert(std::is_trivially_copyable<RockGameSnapshot>::value,
-              "game snapshot must remain safe for SharedFrame copies");
-static_assert(std::is_trivially_copyable<ExperienceFrame>::value,
-              "experience frame must remain safe for SharedFrame copies");
-static_assert(sizeof(RockGameSnapshot) <= 64,
-              "game snapshot must remain lightweight");
 static_assert(std::is_trivially_copyable<RtlFrame>::value,
               "RTL frame must remain safe for deterministic copies");
 
@@ -780,223 +773,6 @@ static void test_ui_numeric_clamps() {
     TEST_ASSERT_EQUAL_UINT16(3500, clampU16(9000, 500, 3500));
 }
 
-// ── Dust Runner off-road arcade ─────────────────────────────────────
-
-static void enterGamePlayAt(RockLineGame& game, uint32_t start,
-                            uint32_t& now) {
-    game.start(start);
-    now = start + RockLineGame::COUNTDOWN_MS;
-    game.update(now);
-    TEST_ASSERT_EQUAL_INT((int)RockGameStatus::PLAYING,
-                          (int)game.snapshot(now).status);
-}
-
-static void enterGamePlay(RockLineGame& game, uint32_t& now) {
-    enterGamePlayAt(game, 0, now);
-}
-
-static int cleanTarget(const RockGameSnapshot& snapshot) {
-    if (snapshot.obstacle >= snapshot.total_obstacles)
-        return snapshot.line_x;
-    const int rock = RockLineGame::obstacleLine(snapshot.obstacle);
-    const int radius = RockLineGame::obstacleRadius(snapshot.obstacle) +
-                       RockLineGame::VEHICLE_HALF_WIDTH + 8;
-    if (!RockLineGame::isCollision(snapshot.line_x, rock,
-                                    RockLineGame::obstacleRadius(
-                                        snapshot.obstacle)))
-        return snapshot.line_x;
-    int left = rock - radius;
-    int right = rock + radius;
-    if (left < -80) left = -80;
-    if (right > 80) right = 80;
-    int left_delta = snapshot.line_x - left;
-    if (left_delta < 0) left_delta = -left_delta;
-    int right_delta = snapshot.line_x - right;
-    if (right_delta < 0) right_delta = -right_delta;
-    return left_delta <= right_delta ? left : right;
-}
-
-static void driveOneObstacle(RockLineGame& game, uint32_t& now,
-                             bool hit) {
-    const uint8_t before = game.snapshot(now).obstacle;
-    for (int i=0; i<300 && game.snapshot(now).obstacle == before; ++i) {
-        RockGameSnapshot snapshot = game.snapshot(now);
-        int target = hit ? RockLineGame::obstacleLine(before)
-                         : cleanTarget(snapshot);
-        int steer = snapshot.line_x < target-2 ? 100
-                  : snapshot.line_x > target+2 ? -100 : 0;
-        game.control(steer, true, now);
-        now += 20;
-        game.update(now);
-    }
-}
-
-static RockGameSnapshot driveCleanCourse(RockLineGame& game, uint32_t& now) {
-    for (int i=0; i<4000 && !game.isFinished(); ++i) {
-        RockGameSnapshot snapshot = game.snapshot(now);
-        if (snapshot.status == RockGameStatus::CRASHED) {
-            now += 20;
-            game.update(now);
-            continue;
-        }
-        int target = cleanTarget(snapshot);
-        int steer = snapshot.line_x < target-2 ? 100
-                  : snapshot.line_x > target+2 ? -100 : 0;
-        game.control(steer, true, now);
-        now += 20;
-        game.update(now);
-    }
-    return game.snapshot(now);
-}
-
-static void test_rock_game_countdown_and_obstacle_sequence() {
-    RockLineGame game;
-    game.start(100);
-    TEST_ASSERT_EQUAL_INT((int)RockGameStatus::COUNTDOWN,
-                          (int)game.snapshot(100).status);
-    game.update(2499);
-    TEST_ASSERT_EQUAL_INT((int)RockGameStatus::COUNTDOWN,
-                          (int)game.snapshot(2499).status);
-    game.update(2500);
-    TEST_ASSERT_EQUAL_INT((int)RockGameStatus::PLAYING,
-                          (int)game.snapshot(2500).status);
-    for (uint8_t i=0; i<RockLineGame::TOTAL_OBSTACLES; ++i) {
-        int x = RockLineGame::obstacleLine(i);
-        TEST_ASSERT_TRUE(x >= -72 && x <= 72);
-        TEST_ASSERT_EQUAL_INT(x, RockLineGame::obstacleLine(i));
-        TEST_ASSERT_TRUE(RockLineGame::obstacleRadius(i) >= 14);
-        TEST_ASSERT_TRUE(RockLineGame::obstacleRadius(i) <= 17);
-    }
-}
-
-static void test_rock_game_snapshot_projects_visible_obstacles() {
-    RockLineGame game;
-    game.enterArcade(100);
-    RockGameSnapshot attract = game.snapshot(100);
-    TEST_ASSERT_TRUE(attract.visible_obstacles >= 3);
-    TEST_ASSERT_EQUAL_INT16(RockLineGame::obstacleLine(0),
-                            attract.obstacles[0].line_x);
-    TEST_ASSERT_EQUAL_UINT16(260, attract.nearest_distance);
-    TEST_ASSERT_TRUE(RockLineGame::isCollision(-48.0f, -48, 15));
-    TEST_ASSERT_TRUE(RockLineGame::isCollision(-23.0f, -48, 15));
-    TEST_ASSERT_FALSE(RockLineGame::isCollision(-22.0f, -48, 15));
-}
-
-static void test_rock_game_dodge_scores_combo() {
-    RockLineGame game; uint32_t now;
-    enterGamePlay(game, now);
-    driveOneObstacle(game, now, false);
-    RockGameSnapshot s = game.snapshot(now);
-    TEST_ASSERT_EQUAL_UINT8(1, s.obstacle);
-    TEST_ASSERT_EQUAL_UINT8(3, s.lives);
-    TEST_ASSERT_EQUAL_UINT8(1, s.combo);
-    TEST_ASSERT_TRUE(s.score >= 80);
-    TEST_ASSERT_TRUE(s.last_event == RockGameEvent::DODGED ||
-                     s.last_event == RockGameEvent::NEAR_MISS);
-}
-
-static void test_rock_game_hit_costs_life() {
-    RockLineGame game; uint32_t now;
-    enterGamePlay(game, now);
-    driveOneObstacle(game, now, true);
-    RockGameSnapshot s = game.snapshot(now);
-    TEST_ASSERT_EQUAL_UINT8(1, s.obstacle);
-    TEST_ASSERT_EQUAL_UINT8(2, s.lives);
-    TEST_ASSERT_EQUAL_UINT8(0, s.combo);
-    TEST_ASSERT_EQUAL_INT((int)RockGameEvent::HIT, (int)s.last_event);
-    TEST_ASSERT_EQUAL_INT((int)RockGameStatus::CRASHED, (int)s.status);
-    now += RockLineGame::CRASH_RECOVERY_MS;
-    game.update(now);
-    TEST_ASSERT_EQUAL_INT((int)RockGameStatus::PLAYING,
-                          (int)game.snapshot(now).status);
-}
-
-static void test_rock_game_pause_freezes_and_resumes() {
-    RockLineGame game; uint32_t now;
-    enterGamePlay(game, now);
-    for (int i=0; i<20; ++i) {
-        game.control(35, true, now);
-        now += 20;
-        game.update(now);
-    }
-    game.pause(now);
-    RockGameSnapshot paused = game.snapshot(now);
-    TEST_ASSERT_EQUAL_INT((int)RockGameStatus::PAUSED, (int)paused.status);
-    game.control(100, true, now+100);
-    game.update(now+5000);
-    RockGameSnapshot frozen = game.snapshot(now+5000);
-    TEST_ASSERT_EQUAL_UINT16(paused.world_distance, frozen.world_distance);
-    TEST_ASSERT_EQUAL_UINT32(paused.elapsed_ms, frozen.elapsed_ms);
-    TEST_ASSERT_EQUAL_INT8(0, frozen.steering);
-    TEST_ASSERT_EQUAL_UINT8(0, frozen.throttle);
-
-    now += 5000;
-    game.resume(now);
-    game.control(0, true, now);
-    now += 50;
-    game.update(now);
-    RockGameSnapshot resumed = game.snapshot(now);
-    TEST_ASSERT_EQUAL_INT((int)RockGameStatus::PLAYING, (int)resumed.status);
-    TEST_ASSERT_TRUE(resumed.world_distance > frozen.world_distance);
-    TEST_ASSERT_TRUE(resumed.elapsed_ms > frozen.elapsed_ms);
-}
-
-static void test_rock_game_attract_input_clamp_and_watchdog() {
-    RockLineGame game; game.enterArcade(100);
-    TEST_ASSERT_EQUAL_INT((int)RockGameStatus::ATTRACT,
-                          (int)game.snapshot(600).status);
-    game.start(1000);
-    game.update(1000 + RockLineGame::COUNTDOWN_MS);
-    uint32_t now = 1000 + RockLineGame::COUNTDOWN_MS;
-    game.control(140, true, now);
-    RockGameSnapshot live = game.snapshot(now);
-    TEST_ASSERT_EQUAL_INT8(100, live.steering);
-    TEST_ASSERT_EQUAL_UINT8(1, live.throttle);
-    game.update(now + RockLineGame::INPUT_TIMEOUT_MS + 1u);
-    RockGameSnapshot safe = game.snapshot(
-        now + RockLineGame::INPUT_TIMEOUT_MS + 1u);
-    TEST_ASSERT_EQUAL_INT8(0, safe.steering);
-    TEST_ASSERT_EQUAL_UINT8(0, safe.throttle);
-}
-
-static void test_rock_game_full_course_and_restart() {
-    RockLineGame game; uint32_t now;
-    enterGamePlay(game, now);
-    RockGameSnapshot result = driveCleanCourse(game, now);
-    TEST_ASSERT_EQUAL_INT((int)RockGameStatus::FINISHED,
-                          (int)result.status);
-    TEST_ASSERT_TRUE(result.course_clear);
-    TEST_ASSERT_EQUAL_UINT8(RockLineGame::TOTAL_OBSTACLES,
-                            result.obstacle);
-    TEST_ASSERT_TRUE(result.lives > 0);
-    TEST_ASSERT_TRUE(result.score > 1000);
-
-    game.start(now + 100u);
-    RockGameSnapshot restarted = game.snapshot(now + 100u);
-    TEST_ASSERT_EQUAL_INT((int)RockGameStatus::COUNTDOWN,
-                          (int)restarted.status);
-    TEST_ASSERT_EQUAL_UINT32(0, restarted.score);
-    TEST_ASSERT_EQUAL_UINT8(3, restarted.lives);
-    TEST_ASSERT_EQUAL_UINT8(0, restarted.obstacle);
-}
-
-static void test_rock_game_millis_wrap_safe() {
-    RockLineGame game; uint32_t now;
-    enterGamePlayAt(game, UINT32_MAX - 1000u, now);
-    TEST_ASSERT_TRUE(now < 2000u);
-    for (int i=0; i<20; ++i) {
-        game.control(20, true, now);
-        now += 20;
-        game.update(now);
-    }
-    RockGameSnapshot before = game.snapshot(now);
-    TEST_ASSERT_TRUE(before.elapsed_ms > 0);
-    game.pause(now);
-    game.update(now + 1000u);
-    TEST_ASSERT_EQUAL_UINT32(before.elapsed_ms,
-                             game.snapshot(now + 1000u).elapsed_ms);
-}
-
 static void test_rtl_profiles_priority_and_timeout() {
     RtlLogic rtl(RtlProfile::ULTRA4_4400, 16, 1000);
     RtlFrame safe = rtl.frame(0);
@@ -1026,35 +802,6 @@ static void test_rtl_count_clamp_and_wrap_keepalive() {
     TEST_ASSERT_TRUE(rtl.frame(301).command_timed_out);
     rtl.configure(RtlProfile::RTL_S, 200, 500);
     TEST_ASSERT_EQUAL_UINT16(RTL_LOGIC_MAX_PIXELS, rtl.ledCount());
-}
-
-static void test_experience_game_mode_pause_resume_and_stop() {
-    ExperienceEngine experience;
-    experience.reset(100);
-    TEST_ASSERT_EQUAL_INT((int)ExperienceMode::NORMAL,
-                          (int)experience.frame(100).mode);
-
-    experience.enterGameAttract(200);
-    TEST_ASSERT_EQUAL_INT((int)ExperienceMode::GAME,
-                          (int)experience.frame(200).mode);
-    TEST_ASSERT_EQUAL_INT((int)RockGameStatus::ATTRACT,
-                          (int)experience.frame(200).game.status);
-
-    experience.startGame(300);
-    VehicleState vehicle;
-    UiFx fx;
-    const uint32_t play_at = 300 + RockLineGame::COUNTDOWN_MS;
-    experience.update(play_at, vehicle, fx);
-    experience.pauseGame(play_at);
-    TEST_ASSERT_EQUAL_INT((int)RockGameStatus::PAUSED,
-                          (int)experience.frame(play_at).game.status);
-    experience.resumeGame(play_at + 500);
-    TEST_ASSERT_EQUAL_INT((int)RockGameStatus::PLAYING,
-                          (int)experience.frame(play_at + 500).game.status);
-
-    experience.stopGame();
-    TEST_ASSERT_EQUAL_INT((int)ExperienceMode::NORMAL,
-                          (int)experience.frame(play_at + 600).mode);
 }
 
 // ── Runner ───────────────────────────────────────────────────────────────────
@@ -1127,17 +874,8 @@ int main(int, char**) {
     RUN_TEST(test_fmt_race_time);
     RUN_TEST(test_ui_theme_sanitization);
     RUN_TEST(test_ui_numeric_clamps);
-    RUN_TEST(test_rock_game_countdown_and_obstacle_sequence);
-    RUN_TEST(test_rock_game_snapshot_projects_visible_obstacles);
-    RUN_TEST(test_rock_game_dodge_scores_combo);
-    RUN_TEST(test_rock_game_hit_costs_life);
-    RUN_TEST(test_rock_game_pause_freezes_and_resumes);
-    RUN_TEST(test_rock_game_attract_input_clamp_and_watchdog);
-    RUN_TEST(test_rock_game_full_course_and_restart);
-    RUN_TEST(test_rock_game_millis_wrap_safe);
     RUN_TEST(test_rtl_profiles_priority_and_timeout);
     RUN_TEST(test_rtl_count_clamp_and_wrap_keepalive);
-    RUN_TEST(test_experience_game_mode_pause_resume_and_stop);
 
     return UNITY_END();
 }

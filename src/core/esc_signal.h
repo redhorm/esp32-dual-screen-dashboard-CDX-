@@ -30,6 +30,13 @@ struct EscSignalConfig {
     // enter_threshold and remains latched until it crosses exit_threshold.
     float enter_threshold = 0.12f;
     float exit_threshold = 0.06f;
+    // Optional directional thresholds preserve a deadband expressed in real
+    // microseconds when neutral is not exactly centered between endpoints.
+    // Negative values inherit the generic threshold for backward compatibility.
+    float forward_enter_threshold = -1.0f;
+    float reverse_enter_threshold = -1.0f;
+    float forward_exit_threshold = -1.0f;
+    float reverse_exit_threshold = -1.0f;
 
     // Input conditioning outside the ISR.  Smoothing removes PWM jitter while
     // the slew limit rejects implausible command steps without adding delay to
@@ -71,6 +78,10 @@ public:
     static const char* stateName(EscDriveState state);
     static const char* typeName(EscType type);
     static EscType typeFromName(const char* name);
+    // Converts a symmetric neutral band expressed in real PWM microseconds
+    // into direction-specific normalized thresholds.
+    static void configureDeadbandUs(EscSignalConfig& config,
+                                    uint16_t deadband_us);
 
 private:
     enum class Band : int8_t { REVERSE = -1, NEUTRAL = 0, FORWARD = 1 };

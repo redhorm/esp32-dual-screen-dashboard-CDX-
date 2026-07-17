@@ -1,59 +1,93 @@
-# INIZIA QUI — BETA 4.1
+# INIZIA QUI — BETA 5
 
-## Dispositivo già programmato
+Questa è la procedura minima per usare **Ultra4 Microdash 5.0.0-beta.1**.
 
-1. Collega un cavo USB-C dati.
-2. Attendi circa 5 secondi.
-3. Leggi rete e password sui display.
-4. Collegati al Wi-Fi `ULTRA4-DASH-XXXXXXXX`.
-5. Rimani collegato anche se il telefono indica “nessuna Internet”.
+## 1. Accendi e collegati
+
+1. Alimenta la scheda con un cavo USB-C dati.
+2. Attendi **CONTROLLO SISTEMA / SYSTEM CHECK**.
+3. Al primo avvio leggi nome rete e password sui display; se la scheda era già
+   configurata tieni premuto **BOOT** per mostrarle.
+4. Dal telefono collegati a `ULTRA4-DASH-XXXXXXXX`.
+5. Ignora l’avviso “nessuna Internet” e resta su questa rete.
 6. Se la pagina non compare, apri `http://192.168.4.1`.
 
-Scegli **IT** o **EN** nell’intestazione: la lingua viene applicata al portale e
-ai due display e resta salvata.
+`PSRAM OPTIONAL` è normale su questa scheda N8. Per rivedere in seguito le
+credenziali, tieni premuto **BOOT** mentre il dispositivo è acceso.
 
-Per rivedere in seguito rete e password, tieni premuto **BOOT** mentre il
-dispositivo è acceso.
+## 2. Completa il primo avvio
 
-## Prima configurazione
-
-Inserisci soltanto:
+Scegli **IT** o **EN**, poi inserisci:
 
 1. numero gara;
 2. nome veicolo;
 3. pilota.
 
-Premi **SALVA E INIZIA**. Puoi modificare questi dati dalla HOME, che mostra
-anche velocità, RPM, marcia e batteria.
+Premi **SALVA E INIZIA**. Questi dati si modificano in qualsiasi momento da
+HOME → **MODIFICA**.
 
-## Menu in basso
+## 3. Usa il menu in basso
 
-- **HOME** — riepilogo del veicolo;
+- **HOME** — riepilogo e diagnostica;
 - **DASH** — Classic Rally, Race Realism o Auto di serie;
-- **MEDIA** — immagine di avvio e cornice digitale;
-- **GAME** — DESERT BLITZ;
-- **RTL** — barra WS2812 e ingresso ESC.
+- **MEDIA** — immagine boot e cornice digitale;
+- **GAME** — ULTRA4: Trail Assault;
+- **RTL** — barra posteriore e ingresso ESC.
 
-## Caricare una foto
+## 4. Scegli la dashboard
+
+In **DASH** scegli una delle tre coppie grafiche, imposta unità e luminosità,
+quindi premi **SALVA DASH**.
+
+- Classic Rally: stile gara originale.
+- Race Realism: quadro pilota racing e navigazione copilota offroad.
+- Auto di serie: quadro OEM moderno.
+
+## 5. Carica una foto
 
 1. Apri **MEDIA**.
-2. Scegli un file JPG, JPEG, PNG o WEBP.
-3. Controlla l’anteprima.
-4. Premi **CARICA** e attendi il 100%.
+2. Scegli JPG/JPEG, PNG, WEBP o HEIC/HEIF. Se il browser non apre HEIC, usa
+   JPG o PNG.
+3. Controlla le due anteprime.
+4. Premi **CARICA** e attendi il messaggio di conferma.
 
-Il dispositivo ottimizza la foto per entrambi i display e la conserva dopo il
-riavvio o il refresh della pagina. Anteprima, selezione e pulsanti sono separati
-in aree compatte. Per la cornice digitale puoi selezionare più file e regolare
-display, intervallo, ordine e transizione.
+Il telefono crea automaticamente la versione 160×80 e quella 240×240. Non
+spegnere durante il commit. Se l’upload fallisce, la foto precedente resta
+intatta. La galleria contiene fino a 24 foto; intervallo, ordine, transizione e
+display di destinazione sono regolabili.
 
-## Giocare a DESERT BLITZ
+## 6. Gioca a Trail Assault
 
-- premi **START**;
-- usa i pulsanti sinistra, destra e GAS;
-- da tastiera usa `←`/`→` o `A`/`D`, `↑`/`W`/spazio per GAS;
-- premi **P** o **PAUSA** per fermare e riprendere la partita.
+1. Apri **GAME** e ruota il telefono in orizzontale.
+2. Scegli Time Attack, Gate Rush o Hill Climb.
+3. Lascia il seed proposto oppure inseriscine uno condiviso.
+4. Premi **AVVIA / START**: su iPhone questo gesto attiva anche l’audio.
+5. Muovi il dito sul volante; scorri verticalmente su GAS e FRENO.
 
-## Programmare o aggiornare la scheda
+Il controller invia comandi analogici. Se la pagina perde il collegamento per
+300 ms, il gioco azzera automaticamente sterzo, gas e freno. Uscendo dalla
+scheda GAME i comandi tornano subito neutrali.
+
+Tastiera: `A/D` o `←/→`, `W/↑/spazio` gas, `S/↓` freno, `P` pausa.
+
+## 7. Controlla lo stato
+
+Apri HOME → **DIAGNOSTICA**. Verifica:
+
+- display A e B: `OK`;
+- LittleFS: pronta;
+- AP: online;
+- PSRAM: assente/0 è previsto;
+- `lastError`: vuoto o `none`.
+
+FPS nominali: pilota circa 30; copilota circa 12,5 in dashboard e 20 durante
+Trail Assault. Sono obiettivi da verificare sulla scheda reale.
+
+## Programmare o aggiornare via USB
+
+Non serve Homebrew.
+
+Aggiornamento normale, che conserva foto e immagine boot:
 
 ```bash
 # macOS / Linux
@@ -63,22 +97,29 @@ python3 tools/flash_dashboard.py --flash
 py tools\flash_dashboard.py --flash
 ```
 
-Al primo utilizzo resta online e conferma l’installazione di PlatformIO. Non
-serve Homebrew.
+Prima installazione su una scheda nuova:
 
-Se la scheda non viene trovata: cambia cavo, tieni premuto **BOOT**, premi e
-rilascia **RESET**, rilascia **BOOT** e ripeti il comando.
+```bash
+python3 tools/flash_dashboard.py --flash --factory-init-media
+```
 
-## Collegamenti RTL ed ESC
+`--factory-init-media` inizializza LittleFS ma **cancella tutta la galleria e
+l'immagine boot**. Non usarlo per gli aggiornamenti ordinari.
 
-- GPIO 4: solo DATA WS2812; alimentazione 5 V separata e massa comune;
-- GPIO 5: ingresso PWM ESC, disabilitato finché non viene configurato;
-- mai collegare un GPIO direttamente ai 12 V;
-- usa protezioni e livelli logici compatibili con 3,3 V.
+Al primo utilizzo resta online: il tool può installare PlatformIO in una
+cartella isolata del progetto.
 
-La barra è scenografica e non sostituisce luci o sistemi di sicurezza
-omologati.
+Questa versione non ha aggiornamento OTA né rollback firmware: la flash è
+sempre cablata. Se la scheda non viene trovata, cambia cavo; poi tieni premuto
+BOOT, premi e rilascia RESET, rilascia BOOT e ripeti.
 
-## Guida illustrata
+## RTL ed ESC: prima la sicurezza
 
-[Apri la guida rapida PDF](output/pdf/Guida_Rapida_ESP32_Dual_Screen.pdf)
+- GPIO 4: solo DATA WS2812, con 5 V separati e massa comune;
+- GPIO 5: ingresso PWM ESC di sola lettura, disabilitato finché non configurato;
+- mai collegare GPIO o LED direttamente ai 12 V;
+- il segnale ESC deve essere limitato a 3,3 V;
+- la barra non sostituisce luci o sistemi di sicurezza omologati.
+
+Per dettagli tecnici consulta [README.md](README.md) e
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).

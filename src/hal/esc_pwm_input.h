@@ -46,6 +46,10 @@ public:
 private:
     static EscPwmInput* _instance;
 
+    // The GPIO ISR may execute on a different core from controlIoTick().
+    // A shared spinlock is therefore required; noInterrupts() is core-local.
+    portMUX_TYPE _capture_mux = portMUX_INITIALIZER_UNLOCKED;
+
     volatile uint32_t _rise_us = 0;
     volatile uint32_t _last_valid_us = 0;
     volatile uint16_t _pulse_us = 0;

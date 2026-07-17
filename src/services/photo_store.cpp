@@ -53,39 +53,28 @@ bool PhotoStore::begin() {
         const char* recovery_label = canonical_exists
             ? PHOTO_FS_PARTITION_LABEL
             : (legacy_exists ? PHOTO_FS_LEGACY_PARTITION_LABEL : nullptr);
-        if (!recovery_label) {
-            _upload_error = PhotoUploadError::FILESYSTEM;
-            Serial.println("[photos] fs init failed: LittleFS partition not found");
-            return false;
-        }
-
-        // Retry once before formatting.  Formatting is only attempted on a
-        // partition proven to exist, which avoids erasing unrelated storage
-        // when a partition-table label is wrong.
-        if (mountPhotoPartition(recovery_label)) {
+        if (recovery_label && mountPhotoPartition(recovery_label)) {
             mounted_label = recovery_label;
-        } else {
-            Serial.printf("[photos] fs mount failed on '%s'; formatting partition\n",
-                          recovery_label);
-            // The failed begin above selected recovery_label inside LittleFS,
-            // so format() targets that exact partition.
-            if (LittleFS.format() && mountPhotoPartition(recovery_label)) {
-                mounted_label = recovery_label;
-                _formatted_on_begin = true;
-            }
         }
     }
 
     if (!mounted_label) {
         _upload_error = PhotoUploadError::FILESYSTEM;
-        Serial.println("[photos] fs recovery failed: storage remains unavailable");
+        _degraded = true;
+        // A transient mount error must never erase customer media.  Formatting
+        // is deliberately reserved for an explicit factory-reset workflow.
+        Serial.println("[photos] fs mount failed: media disabled without formatting");
         return false;
     }
 
     snprintf(_partition_label, sizeof(_partition_label), "%s", mounted_label);
     _ready = true;
     bool healthy = false;
-    if (_take()) { healthy=_scrubUnlocked(); _give(); }
+    if (_take()) {
+        healthy = _scrubUnlocked();
+        _refreshCatalogueUnlocked();
+        _give();
+    }
     _degraded = !healthy;
     if (!healthy) _upload_error = PhotoUploadError::FILESYSTEM;
 
@@ -135,8 +124,63 @@ uint32_t PhotoStore::_slotMaskUnlocked() {
     return mask;
 }
 
-bool PhotoStore::_validJpegUnlocked(const char* path) {
+size_t PhotoStore::_fileSizeUnlocked(const char* path) {
+    File file = LittleFS.open(path, "r");
+    if (!file) return 0;
+    const size_t bytes = file.size();
+    file.close();
+    return bytes;
+}
+
+void PhotoStore::_refreshCatalogueUnlocked() {
+    _slot_mask_cache = _slotMaskUnlocked();
+    _boot_mask_cache = 0;
+    _user_bytes_cache = 0;
+    _transaction_bytes_cache = 0;
+
+    for (uint8_t role = 0; role < 2; ++role) {
+        const char* path = bootPath(role != 0);
+        const size_t bytes = _fileSizeUnlocked(path);
+        if (bytes) {
+            _boot_mask_cache |= static_cast<uint8_t>(1u << role);
+            _user_bytes_cache += bytes;
+        }
+        _transaction_bytes_cache += _fileSizeUnlocked(bootStagePath(role != 0));
+    }
+    _transaction_bytes_cache += _fileSizeUnlocked("/.boot_a.bak");
+    _transaction_bytes_cache += _fileSizeUnlocked("/.boot_b.bak");
+    _transaction_bytes_cache += _fileSizeUnlocked("/.upload.tmp");
+
+    char path[20];
+    for (uint8_t slot = 0; slot < PHOTO_MAX_SLOTS; ++slot) {
+        for (uint8_t role = 0; role < 2; ++role) {
+            photoPath(path, sizeof(path), slot, role != 0);
+            _user_bytes_cache += _fileSizeUnlocked(path);
+            photoStagePath(path, sizeof(path), slot, role != 0);
+            _transaction_bytes_cache += _fileSizeUnlocked(path);
+            snprintf(path, sizeof(path), "/.p%02u_%c.bak", slot,
+                     role ? 'b' : 'a');
+            _transaction_bytes_cache += _fileSizeUnlocked(path);
+        }
+    }
+    ++_catalogue_generation;
+}
+
+bool PhotoStore::_validJpegUnlocked(const char* path,
+                                    uint16_t expected_width,
+                                    uint16_t expected_height) {
     if (!LittleFS.exists(path)) return false;
+    if (!expected_width || !expected_height) {
+        const bool driver = strstr(path, "_a.") != nullptr;
+        const bool navigator = strstr(path, "_b.") != nullptr;
+        if (driver) {
+            expected_width = 160;
+            expected_height = 80;
+        } else if (navigator) {
+            expected_width = 240;
+            expected_height = 240;
+        }
+    }
     File file = LittleFS.open(path, "r");
     if (!file || file.size() < PHOTO_MIN_JPEG_BYTES) {
         if (file) file.close();
@@ -179,6 +223,10 @@ bool PhotoStore::_validJpegUnlocked(const char* path) {
                               marker != 0xC4 && marker != 0xC8 &&
                               marker != 0xCC;
         if (is_frame) {
+            // The ESP32 decoder is deliberately fed baseline sequential JPEG
+            // only.  Reject progressive/arithmetic variants before commit so
+            // a phone upload can never create an endless decode retry loop.
+            if (marker != 0xC0 || found_frame) { ok = false; break; }
             if (segment_len < 11) { ok = false; break; }
             const int precision = file.read();
             const int height_hi = file.read();
@@ -186,15 +234,18 @@ bool PhotoStore::_validJpegUnlocked(const char* path) {
             const int width_hi = file.read();
             const int width_lo = file.read();
             const int components = file.read();
-            if (precision < 0 || height_hi < 0 || height_lo < 0 ||
-                width_hi < 0 || width_lo < 0 || components < 1 || components > 4 ||
+            if (precision != 8 || height_hi < 0 || height_lo < 0 ||
+                width_hi < 0 || width_lo < 0 ||
+                (components != 1 && components != 3) ||
                 segment_len != static_cast<size_t>(8 + 3 * components)) {
                 ok = false;
                 break;
             }
             const uint16_t height = static_cast<uint16_t>((height_hi << 8) | height_lo);
             const uint16_t width = static_cast<uint16_t>((width_hi << 8) | width_lo);
-            if (!width || !height || width > 8192 || height > 8192) {
+            if (!width || !height ||
+                (expected_width && width != expected_width) ||
+                (expected_height && height != expected_height)) {
                 ok = false;
                 break;
             }
@@ -343,7 +394,6 @@ bool PhotoStore::_scrubUnlocked() {
     LittleFS.remove(bootStagePath(false));
     LittleFS.remove(bootStagePath(true));
     bool recovered=_recoverPairUnlocked(boot_a, boot_b, "/.boot_a.bak", "/.boot_b.bak");
-    if(!recovered)recovered=_recoverPairUnlocked(boot_a,boot_b,"/.boot_a.bak","/.boot_b.bak");
     healthy=healthy&&recovered;
     char a[20], b[20], sa[20], sb[20], ba[20], bb[20];
     for (uint8_t i=0;i<PHOTO_MAX_SLOTS;i++) {
@@ -361,7 +411,6 @@ bool PhotoStore::_scrubUnlocked() {
                           (b_exists && !b_valid);
         LittleFS.remove(sa); LittleFS.remove(sb);
         recovered=_recoverPairUnlocked(a,b,ba,bb);
-        if(!recovered)recovered=_recoverPairUnlocked(a,b,ba,bb);
         healthy=healthy&&recovered;
     }
     _recovered_on_begin = recovery_needed;
@@ -371,10 +420,7 @@ bool PhotoStore::_scrubUnlocked() {
 }
 
 uint32_t PhotoStore::slotMask() {
-    if (!_ready || !_take()) return 0;
-    uint32_t mask = _slotMaskUnlocked();
-    _give();
-    return mask;
+    return _ready ? _slot_mask_cache : 0;
 }
 
 uint8_t PhotoStore::count() {
@@ -382,10 +428,8 @@ uint8_t PhotoStore::count() {
 }
 
 bool PhotoStore::hasBoot(bool navigator) {
-    if (!_ready || !_take()) return false;
-    bool found = LittleFS.exists(bootPath(navigator));
-    _give();
-    return found;
+    const uint8_t bit = navigator ? 2u : 1u;
+    return _ready && (_boot_mask_cache & bit) != 0;
 }
 
 bool PhotoStore::_drawFile(lgfx::LGFX_Sprite& sprite, const char* path,
@@ -401,6 +445,21 @@ bool PhotoStore::drawBoot(lgfx::LGFX_Sprite& sprite, bool navigator) {
                         navigator ? 240 : 160, navigator ? 240 : 80);
     _give();
     return ok;
+}
+
+bool PhotoStore::acquireReadLease(const char* path, File& file) {
+    if (!ready() || !path || !_take()) return false;
+    file = LittleFS.open(path, "r");
+    if (!file) {
+        _give();
+        return false;
+    }
+    return true;
+}
+
+void PhotoStore::releaseReadLease(File& file) {
+    if (file) file.close();
+    _give();
 }
 
 int PhotoStore::_firstSlot(uint32_t mask) {
@@ -429,36 +488,77 @@ bool PhotoStore::drawFrame(lgfx::LGFX_Sprite& sprite, bool navigator,
                            PhotoFrameState& state, const UiSettings& settings,
                            uint32_t now_ms) {
     if (!_ready || !_take()) return false;
-    uint32_t mask = _slotMaskUnlocked();
-    if (!mask) { _give(); return false; }
+    const uint32_t catalogue_mask = _slot_mask_cache;
+    if (!catalogue_mask) { _give(); return false; }
+
+    if (state.catalogue_generation != _catalogue_generation) {
+        state.catalogue_generation = _catalogue_generation;
+        state.slot = -1;
+        state.loaded = false;
+        state.failed_slot = -1;
+        state.decode_failures = 0;
+        state.retry_after_ms = 0;
+    }
+
+    uint32_t mask = catalogue_mask;
+    if (state.failed_slot >= 0) {
+        if (static_cast<int32_t>(now_ms - state.retry_after_ms) >= 0) {
+            state.failed_slot = -1;
+            state.decode_failures = 0;
+            state.retry_after_ms = 0;
+        } else {
+            mask &= ~(1UL << state.failed_slot);
+            // With a single bad image, wait instead of hammering LittleFS and
+            // the JPEG decoder on every display frame.
+            if (!mask) { _give(); return false; }
+        }
+    }
 
     if (state.slot < 0 || !(mask & (1UL << state.slot))) {
         state.slot = _firstSlot(mask);
         state.shown_at_ms = now_ms;
         state.loaded = false;
+        state.transition_stage = 0;
+        state.decode_failures = 0;
     }
     uint32_t interval_ms = (uint32_t)settings.photo_interval_s * 1000UL;
     if (now_ms - state.shown_at_ms >= interval_ms) {
         state.slot = _nextSlot(mask, state.slot, settings.photo_random, now_ms);
         state.shown_at_ms = now_ms;
         state.loaded = false;
+        state.transition_stage = 0;
+        state.decode_failures = 0;
     }
 
     uint32_t age = now_ms - state.shown_at_ms;
-    bool dissolving = settings.photo_transition == 1 && age < 650;
-    if (!state.loaded || dissolving) {
+    const bool staged_transition = settings.photo_transition == 1;
+    const uint8_t desired_stage = !staged_transition ? 2u
+        : (age < 325u ? 0u : (age < 650u ? 1u : 2u));
+    const bool redraw = !state.loaded || state.transition_stage != desired_stage;
+    if (redraw) {
         char path[20];
         photoPath(path, sizeof(path), state.slot, navigator);
         state.loaded = _drawFile(sprite, path,
                                  navigator ? 240 : 160, navigator ? 240 : 80);
+        state.transition_stage = desired_stage;
+        if (state.loaded) {
+            state.decode_failures = 0;
+        } else if (++state.decode_failures >= 2) {
+            state.failed_slot = state.slot;
+            state.retry_after_ms = now_ms + 30000UL;
+            state.decode_failures = 0;
+            Serial.printf("[photos] slot %d decode quarantined for 30s (%s)\n",
+                          state.slot, navigator ? "navigator" : "driver");
+        }
     }
     _give();
     if (!state.loaded) return false;
 
-    // Memory-free dissolve: a deterministic black dither mask thins out over
-    // 650 ms, avoiding a second 240x240 framebuffer.
-    if (dissolving) {
-        int threshold = 16 - (int)(age * 16 / 650);
+    // Three deterministic reveal stages cap JPEG decode work at three passes
+    // per transition instead of decoding on every navigator frame.  This keeps
+    // the memory-free effect while avoiding long filesystem stalls.
+    if (redraw && desired_stage < 2u) {
+        const int threshold = desired_stage == 0u ? 11 : 5;
         int step = navigator ? 6 : 4;
         int w = navigator ? 240 : 160, h = navigator ? 240 : 80;
         for (int y = 0; y < h; y += step)
@@ -503,6 +603,7 @@ bool PhotoStore::beginUpload(const char* path) {
         return false;
     }
     _upload_locked = true;
+    _upload_activity_ms = millis();
     _upload_target = path;
     _upload_bytes = 0;
     _upload_free_at_start = total - used;
@@ -551,6 +652,7 @@ bool PhotoStore::writeUpload(const uint8_t* data, size_t len) {
         return false;
     }
     _upload_bytes += len;
+    _upload_activity_ms = millis();
     _give();
     return true;
 }
@@ -560,9 +662,12 @@ bool PhotoStore::endUpload(bool keep) {
     if (!_take()) { _upload_error=PhotoUploadError::BUSY; return false; }
     const size_t received_bytes = _upload_bytes;
     if (_upload) { _upload.flush(); _upload.close(); }
+    const bool driver = _upload_limit == PHOTO_DRIVER_MAX_BYTES;
     bool valid = keep && _upload_error == PhotoUploadError::NONE &&
                  _upload_bytes >= PHOTO_MIN_JPEG_BYTES &&
-                 _validJpegUnlocked("/.upload.tmp");
+                 _validJpegUnlocked("/.upload.tmp",
+                                    driver ? 160 : 240,
+                                    driver ? 80 : 240);
     if (keep && !valid && _upload_error == PhotoUploadError::NONE)
         _upload_error=PhotoUploadError::INVALID_IMAGE;
     bool committed=false;
@@ -582,8 +687,34 @@ bool PhotoStore::endUpload(bool keep) {
     _upload_target = "";
     _upload_bytes = 0;
     _upload_free_at_start = 0;
+    _upload_activity_ms = 0;
+    _refreshCatalogueUnlocked();
     _give();
     return committed;
+}
+
+bool PhotoStore::abortStaleUpload(uint32_t now_ms, uint32_t timeout_ms) {
+    if (!_upload_locked ||
+        static_cast<uint32_t>(now_ms - _upload_activity_ms) <= timeout_ms)
+        return false;
+    if (!_take()) return false;
+    if (!_upload_locked ||
+        static_cast<uint32_t>(now_ms - _upload_activity_ms) <= timeout_ms) {
+        _give();
+        return false;
+    }
+    if (_upload) _upload.close();
+    LittleFS.remove("/.upload.tmp");
+    _upload_locked = false;
+    _upload_target = "";
+    _upload_bytes = 0;
+    _upload_free_at_start = 0;
+    _upload_activity_ms = 0;
+    _upload_error = PhotoUploadError::INTERRUPTED;
+    _refreshCatalogueUnlocked();
+    _give();
+    Serial.println("[photos] stale upload lease released");
+    return true;
 }
 
 bool PhotoStore::commitSlotUpload(uint8_t slot) {
@@ -597,6 +728,7 @@ bool PhotoStore::commitSlotUpload(uint8_t slot) {
     snprintf(ba,sizeof(ba),"/.p%02u_a.bak",slot);
     snprintf(bb,sizeof(bb),"/.p%02u_b.bak",slot);
     bool ok=_commitPairUnlocked(sa,sb,a,b,ba,bb);
+    _refreshCatalogueUnlocked();
     Serial.printf("[photos] gallery commit slot=%u status=%s\n",
                   static_cast<unsigned>(slot),
                   ok ? "ok" : uploadErrorName(_upload_error));
@@ -614,6 +746,7 @@ bool PhotoStore::abortSlotUpload(uint8_t slot) {
     snprintf(backup_b,sizeof(backup_b),"/.p%02u_b.bak",(unsigned)slot);
     bool recovered=_recoverPairUnlocked(target_a,target_b,backup_a,backup_b);
     if(!recovered)_degraded=true;
+    _refreshCatalogueUnlocked();
     _give();
     return a&&b&&recovered;
 }
@@ -625,6 +758,7 @@ bool PhotoStore::commitBootUpload() {
     bool ok=_commitPairUnlocked(bootStagePath(false),bootStagePath(true),
                                 bootPath(false),bootPath(true),
                                 "/.boot_a.bak","/.boot_b.bak");
+    _refreshCatalogueUnlocked();
     Serial.printf("[photos] boot commit status=%s\n",
                   ok ? "ok" : uploadErrorName(_upload_error));
     _give();
@@ -638,6 +772,7 @@ bool PhotoStore::abortBootUpload() {
     bool recovered=_recoverPairUnlocked(bootPath(false),bootPath(true),
                                         "/.boot_a.bak","/.boot_b.bak");
     if(!recovered)_degraded=true;
+    _refreshCatalogueUnlocked();
     _give();
     return a&&b&&recovered;
 }
@@ -651,6 +786,7 @@ bool PhotoStore::removeSlot(uint8_t slot) {
     photoStagePath(path,sizeof(path),slot,true); LittleFS.remove(path);
     snprintf(backup,sizeof(backup),"/.p%02u_a.bak",slot); LittleFS.remove(backup);
     snprintf(backup,sizeof(backup),"/.p%02u_b.bak",slot); LittleFS.remove(backup);
+    _refreshCatalogueUnlocked();
     _give();
     return a || b;
 }
@@ -661,6 +797,7 @@ bool PhotoStore::removeBoot() {
     bool b=!LittleFS.exists(bootPath(true)) || LittleFS.remove(bootPath(true));
     LittleFS.remove(bootStagePath(false)); LittleFS.remove(bootStagePath(true));
     LittleFS.remove("/.boot_a.bak"); LittleFS.remove("/.boot_b.bak");
+    _refreshCatalogueUnlocked();
     _give(); return a && b;
 }
 
@@ -675,6 +812,27 @@ size_t PhotoStore::usedBytes() {
 }
 size_t PhotoStore::totalBytes() {
     if (!_ready || !_take()) return 0; size_t n = LittleFS.totalBytes(); _give(); return n;
+}
+
+PhotoStorageBreakdown PhotoStore::storageBreakdown() {
+    PhotoStorageBreakdown out;
+    if (!_ready || !_take()) return out;
+    out.total_bytes = LittleFS.totalBytes();
+    out.used_bytes = LittleFS.usedBytes();
+    out.free_bytes = out.total_bytes > out.used_bytes
+        ? out.total_bytes - out.used_bytes : 0;
+    // Game/system art is compiled as RGB565 primitives in firmware, so it
+    // consumes no LittleFS bytes and must not be presented as user storage.
+    out.system_asset_bytes = 0;
+    out.game_asset_bytes = 0;
+    out.user_photo_bytes = _user_bytes_cache;
+    out.transaction_bytes = _transaction_bytes_cache;
+    const size_t classified = out.user_photo_bytes + out.transaction_bytes;
+    out.filesystem_overhead_bytes = out.used_bytes > classified
+        ? out.used_bytes - classified : 0;
+    out.catalogue_generation = _catalogue_generation;
+    _give();
+    return out;
 }
 
 const char* PhotoStore::storageStateName() const {
@@ -695,6 +853,7 @@ const char* PhotoStore::uploadErrorName(PhotoUploadError error) {
         case PhotoUploadError::WRITE_FAILED:  return "write_failed";
         case PhotoUploadError::COMMIT_FAILED: return "commit_failed";
         case PhotoUploadError::INTERRUPTED:   return "interrupted";
+        case PhotoUploadError::GAME_ACTIVE:   return "game_active";
         default:                              return "none";
     }
 }

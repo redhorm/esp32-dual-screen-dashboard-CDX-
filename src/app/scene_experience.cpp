@@ -27,36 +27,40 @@ uint32_t noise32(uint32_t x) {
     return x ^ (x >> 16);
 }
 
-const char* eventName(RockGameEvent event, UiLanguage language) {
+const char* eventName(TrailEvent event, UiLanguage language) {
     switch (event) {
-        case RockGameEvent::DODGED:
+        case TrailEvent::CHECKPOINT:
+        case TrailEvent::GATE_CLEAR:
             return uiText(language, "SUPERATO!", "CLEAR!");
-        case RockGameEvent::NEAR_MISS:
-            return uiText(language, "QUASI!", "NEAR MISS!");
-        case RockGameEvent::HIT:
+        case TrailEvent::JUMP:
+            return uiText(language, "SALTO!", "JUMP!");
+        case TrailEvent::COLLISION_SMALL:
+        case TrailEvent::COLLISION_LARGE:
             return uiText(language, "IMPATTO!", "IMPACT!");
         default:                       return "";
     }
 }
 
-uint16_t eventColor(RockGameEvent event) {
-    if (event == RockGameEvent::HIT) return RED;
-    if (event == RockGameEvent::NEAR_MISS) return ORANGE;
+uint16_t eventColor(TrailEvent event) {
+    if (event == TrailEvent::COLLISION_SMALL ||
+        event == TrailEvent::COLLISION_LARGE) return RED;
+    if (event == TrailEvent::GATE_MISSED ||
+        event == TrailEvent::OVERHEAT) return ORANGE;
     return LIME;
 }
 
-char gameRank(const RockGameSnapshot& game) {
-    if (game.course_clear && game.lives == 3 && game.score >= 3300) return 'S';
-    if (game.course_clear && game.lives >= 2 && game.score >= 2300) return 'A';
+char gameRank(const TrailGameSnapshot& game) {
+    if (game.course_clear && game.damage_permille < 100 && game.score >= 3300) return 'S';
+    if (game.course_clear && game.damage_permille < 300 && game.score >= 2300) return 'A';
     if (game.course_clear) return 'B';
     return 'C';
 }
 
-void drawObstacle(lgfx::LGFX_Sprite& spr, const RockObstacleView& obstacle,
+void drawObstacle(lgfx::LGFX_Sprite& spr, const TrailObjectView& obstacle,
                   int x, int y, int scale) {
     if (scale < 2) scale = 2;
     switch (obstacle.kind) {
-        case RockObstacleKind::LOG:
+        case TrailObstacleKind::LOG:
             spr.fillRoundRect(x-scale*2, y-scale/2, scale*4, scale,
                               scale/2, 0xA2C4);
             spr.drawRoundRect(x-scale*2, y-scale/2, scale*4, scale,
@@ -64,7 +68,7 @@ void drawObstacle(lgfx::LGFX_Sprite& spr, const RockObstacleView& obstacle,
             spr.drawLine(x-scale, y-scale/2, x-scale, y+scale/2, BLACK);
             spr.drawLine(x+scale, y-scale/2, x+scale, y+scale/2, BLACK);
             break;
-        case RockObstacleKind::RUT:
+        case TrailObstacleKind::RUT:
             spr.fillTriangle(x-scale*2, y+scale, x-scale, y-scale,
                              x, y+scale, ROCK);
             spr.fillTriangle(x, y+scale, x+scale, y-scale,
@@ -88,20 +92,20 @@ void drawObstacle(lgfx::LGFX_Sprite& spr, const RockObstacleView& obstacle,
     }
 }
 
-void projectObstacle(const RockObstacleView& obstacle, int center,
+void projectObstacle(const TrailObjectView& obstacle, int center,
                      int horizon_y, int bottom_y, int road_half,
                      int& x, int& y, int& scale) {
-    int distance = obstacle.distance > 1000 ? 1000 : obstacle.distance;
+    int distance = obstacle.distance_dm > 1000 ? 1000 : obstacle.distance_dm;
     int near = 1000 - distance;
     y = horizon_y + (bottom_y - horizon_y) * near / 1000;
     int half = 7 + (road_half - 7) * near / 1000;
-    x = center + obstacle.line_x * half / 88;
+    x = center + obstacle.lateral * half / 80;
     scale = 2 + near * 8 / 1000;
 }
 
-void drawDashWorld(lgfx::LGFX_Sprite& spr, const RockGameSnapshot& game,
+void drawDashWorld(lgfx::LGFX_Sprite& spr, const TrailGameSnapshot& game,
                    uint16_t accent) {
-    const uint32_t motion = game.world_distance;
+    const uint32_t motion = game.distance_cm;
     spr.fillScreen(NIGHT);
 
     // Pixel-sunset and desert silhouettes keep the arcade identity readable
@@ -124,29 +128,29 @@ void drawDashWorld(lgfx::LGFX_Sprite& spr, const RockGameSnapshot& game,
                           stripe&1 ? PURPLE : STEEL);
     }
 
-    for (int i=static_cast<int>(game.visible_obstacles)-1; i>=0; --i) {
+    for (int i=static_cast<int>(game.visible_objects)-1; i>=0; --i) {
         int x, y, scale;
-        projectObstacle(game.obstacles[i], 80, 36, 72, 59, x, y, scale);
-        drawObstacle(spr, game.obstacles[i], x, y, scale);
+        projectObstacle(game.objects[i], 80, 36, 72, 59, x, y, scale);
+        drawObstacle(spr, game.objects[i], x, y, scale);
     }
 
-    const int car_x = 80 + game.line_x * 49 / RockLineGame::ROAD_LIMIT;
+    const int car_x = 80 + game.lateral_permille * 49 / 1000;
     spr.fillRoundRect(car_x-7, 65, 14, 11, 3, accent);
     spr.fillRect(car_x-4, 67, 8, 4, BLACK);
     spr.fillRect(car_x-8, 69, 2, 5, BLACK);
     spr.fillRect(car_x+6, 69, 2, 5, BLACK);
     spr.drawPixel(car_x-4, 75, WHITE);
     spr.drawPixel(car_x+4, 75, RED);
-    if (game.throttle) {
+    if (game.controller.throttle > 0) {
         uint32_t n = noise32(motion + 17u);
         spr.drawPixel(car_x-3-(n&3u), 78, ORANGE);
         spr.drawPixel(car_x+2+((n>>3)&3u), 78, SAND);
     }
 }
 
-void drawNavWorld(lgfx::LGFX_Sprite& spr, const RockGameSnapshot& game,
+void drawNavWorld(lgfx::LGFX_Sprite& spr, const TrailGameSnapshot& game,
                   uint16_t accent) {
-    const uint32_t motion = game.world_distance;
+    const uint32_t motion = game.distance_cm;
     spr.fillScreen(NIGHT);
     for (int i=0; i<18; ++i) {
         uint32_t n = noise32(static_cast<uint32_t>(i)*113u + motion/7u);
@@ -170,18 +174,18 @@ void drawNavWorld(lgfx::LGFX_Sprite& spr, const RockGameSnapshot& game,
                           stripe&1 ? PURPLE : STEEL);
     }
 
-    for (int i=static_cast<int>(game.visible_obstacles)-1; i>=0; --i) {
+    for (int i=static_cast<int>(game.visible_objects)-1; i>=0; --i) {
         int x, y, scale;
-        projectObstacle(game.obstacles[i], 120, 98, 211, 105, x, y, scale);
+        projectObstacle(game.objects[i], 120, 98, 211, 105, x, y, scale);
         scale = 3 + (scale-2)*2;
-        drawObstacle(spr, game.obstacles[i], x, y, scale);
-        if (i == 0 && game.obstacles[i].distance < 180) {
+        drawObstacle(spr, game.objects[i], x, y, scale);
+        if (i == 0 && game.objects[i].distance_dm < 180) {
             spr.drawCircle(x, y, scale*3, RED);
             spr.drawCircle(x, y, scale*3+2, ORANGE);
         }
     }
 
-    const int car_x = 120 + game.line_x * 88 / RockLineGame::ROAD_LIMIT;
+    const int car_x = 120 + game.lateral_permille * 88 / 1000;
     spr.fillRoundRect(car_x-14, 184, 28, 32, 5, accent);
     spr.fillRect(car_x-9, 189, 18, 9, BLACK);
     spr.drawLine(car_x-10, 202, car_x+10, 202, WHITE);
@@ -189,7 +193,7 @@ void drawNavWorld(lgfx::LGFX_Sprite& spr, const RockGameSnapshot& game,
     spr.fillCircle(car_x+12, 210, 4, BLACK);
     spr.fillCircle(car_x-8, 213, 2, RED);
     spr.fillCircle(car_x+8, 213, 2, RED);
-    if (game.throttle) {
+    if (game.controller.throttle > 0) {
         for (int i=0; i<4; ++i) {
             uint32_t n=noise32(motion+static_cast<uint32_t>(i)*31u);
             spr.fillCircle(car_x-14+static_cast<int>(n%29u),
@@ -198,17 +202,17 @@ void drawNavWorld(lgfx::LGFX_Sprite& spr, const RockGameSnapshot& game,
     }
 }
 
-void drawDashOverlay(lgfx::LGFX_Sprite& spr, const RockGameSnapshot& game,
+void drawDashOverlay(lgfx::LGFX_Sprite& spr, const TrailGameSnapshot& game,
                      UiLanguage language) {
     char text[28];
-    if (game.status == RockGameStatus::ATTRACT ||
-        game.status == RockGameStatus::IDLE) {
+    if (game.status == TrailStatus::ATTRACT ||
+        game.status == TrailStatus::IDLE) {
         spr.fillRoundRect(24, 36, 112, 27, 4, BLACK);
         centered(spr, "DESERT BLITZ", 80, 43, &lgfx::fonts::Font2, MAGENTA);
         if (Anim::pulse(game.phase_ms, 420))
             centered(spr, uiText(language, "PREMI START", "PRESS START"),
                      80, 56, &lgfx::fonts::Font0, WHITE);
-    } else if (game.status == RockGameStatus::COUNTDOWN) {
+    } else if (game.status == TrailStatus::COUNTDOWN) {
         int index = game.phase_ms < 1800 ? game.phase_ms / 600 : 3;
         const char* label = index == 3 ? uiText(language, "VIA!", "GO!")
                                        : (index == 0 ? "3" :
@@ -217,18 +221,18 @@ void drawDashOverlay(lgfx::LGFX_Sprite& spr, const RockGameSnapshot& game,
         centered(spr, label, 80, 46,
                  index == 3 ? &lgfx::fonts::Font4 : &lgfx::fonts::Font6,
                  index == 3 ? LIME : WHITE);
-    } else if (game.status == RockGameStatus::PAUSED) {
+    } else if (game.status == TrailStatus::PAUSED) {
         spr.fillRoundRect(35, 29, 90, 35, 5, BLACK);
         centered(spr, uiText(language, "PAUSA", "PAUSED"),
                  80, 43, &lgfx::fonts::Font4, ORANGE);
         centered(spr, uiText(language, "RIPRENDI", "RESUME"),
                  80, 57, &lgfx::fonts::Font0, WHITE);
-    } else if (game.status == RockGameStatus::CRASHED) {
+    } else if (game.status == TrailStatus::FAILED) {
         if (Anim::pulse(game.phase_ms, 85))
             spr.drawRoundRect(1, 12, 158, 67, 5, RED);
         centered(spr, uiText(language, "IMPATTO!", "IMPACT!"),
                  80, 45, &lgfx::fonts::Font4, WHITE);
-    } else if (game.status == RockGameStatus::FINISHED) {
+    } else if (game.status == TrailStatus::FINISHED) {
         spr.fillScreen(BLACK);
         centered(spr, game.course_clear
                  ? uiText(language, "TRACCIA OK", "TRAIL CLEAR")
@@ -241,21 +245,21 @@ void drawDashOverlay(lgfx::LGFX_Sprite& spr, const RockGameSnapshot& game,
         centered(spr, text, 80, 46, &lgfx::fonts::Font2, WHITE);
         centered(spr, uiText(language, "PREMI START", "PRESS START"),
                  80, 68, &lgfx::fonts::Font0, MAGENTA);
-    } else if (game.result_age_ms < 650u &&
-               game.last_event != RockGameEvent::NONE) {
+    } else if (game.event_age_ms < 650u &&
+               game.last_event != TrailEvent::NONE) {
         centered(spr, eventName(game.last_event, language), 80, 45,
                  &lgfx::fonts::Font2, eventColor(game.last_event));
     }
 }
 
-void drawNavOverlay(lgfx::LGFX_Sprite& spr, const RockGameSnapshot& game,
+void drawNavOverlay(lgfx::LGFX_Sprite& spr, const TrailGameSnapshot& game,
                     const ExperienceFrame& experience,
                     const lgfx::IFont* medium,
                     const lgfx::IFont* speed,
                     UiLanguage language) {
     char text[36];
-    if (game.status == RockGameStatus::ATTRACT ||
-        game.status == RockGameStatus::IDLE) {
+    if (game.status == TrailStatus::ATTRACT ||
+        game.status == TrailStatus::IDLE) {
         spr.fillRoundRect(23, 84, 194, 91, 12, BLACK);
         spr.drawRoundRect(23, 84, 194, 91, 12, MAGENTA);
         centered(spr, "DESERT BLITZ", 120, 110, speed, MAGENTA);
@@ -263,7 +267,7 @@ void drawNavOverlay(lgfx::LGFX_Sprite& spr, const RockGameSnapshot& game,
         if (Anim::pulse(game.phase_ms, 420))
             centered(spr, uiText(language, "PREMI START", "PRESS START"),
                      120, 158, medium, WHITE);
-    } else if (game.status == RockGameStatus::COUNTDOWN) {
+    } else if (game.status == TrailStatus::COUNTDOWN) {
         int index = game.phase_ms < 1800 ? game.phase_ms / 600 : 3;
         const char* label = index == 3 ? uiText(language, "VIA!", "GO!")
                                        : (index == 0 ? "3" :
@@ -272,21 +276,21 @@ void drawNavOverlay(lgfx::LGFX_Sprite& spr, const RockGameSnapshot& game,
         spr.drawRoundRect(74, 76, 92, 105, 14, CYAN);
         centered(spr, label, 120, 126, speed,
                  index == 3 ? LIME : WHITE);
-    } else if (game.status == RockGameStatus::PAUSED) {
+    } else if (game.status == TrailStatus::PAUSED) {
         spr.fillRoundRect(35, 86, 170, 82, 12, BLACK);
         spr.drawRoundRect(35, 86, 170, 82, 12, ORANGE);
         centered(spr, uiText(language, "PAUSA", "PAUSED"),
                  120, 114, speed, ORANGE);
         centered(spr, uiText(language, "TOCCA RIPRENDI", "TAP RESUME"),
                  120, 146, medium, WHITE);
-    } else if (game.status == RockGameStatus::CRASHED) {
+    } else if (game.status == TrailStatus::FAILED) {
         if (Anim::pulse(game.phase_ms, 85)) {
             spr.drawRoundRect(5, 33, 230, 181, 12, RED);
             spr.drawRoundRect(9, 37, 222, 173, 10, MAGENTA);
         }
         centered(spr, uiText(language, "IMPATTO!", "IMPACT!"),
                  120, 128, speed, WHITE);
-    } else if (game.status == RockGameStatus::FINISHED) {
+    } else if (game.status == TrailStatus::FINISHED) {
         spr.fillRoundRect(20, 58, 200, 132, 14, BLACK);
         spr.drawRoundRect(20, 58, 200, 132, 14,
                           game.course_clear ? LIME : RED);
@@ -304,8 +308,8 @@ void drawNavOverlay(lgfx::LGFX_Sprite& spr, const RockGameSnapshot& game,
         centered(spr, text, 120, 157, medium, MAGENTA);
         centered(spr, uiText(language, "PREMI START", "PRESS START"), 120, 178,
                  &lgfx::fonts::Font0, CYAN);
-    } else if (game.result_age_ms < 700u &&
-               game.last_event != RockGameEvent::NONE) {
+    } else if (game.event_age_ms < 700u &&
+               game.last_event != TrailEvent::NONE) {
         centered(spr, eventName(game.last_event, language), 120, 126, speed,
                  eventColor(game.last_event));
     }
@@ -318,7 +322,7 @@ bool SceneDashboard::_renderExperienceTakeover(const UiFx& fx) {
     (void)fx;
     if (_experience.mode == ExperienceMode::NORMAL) return false;
 
-    const RockGameSnapshot& game = _experience.game;
+    const TrailGameSnapshot& game = _experience.game;
     drawDashWorld(_spr, game, _experience.identity.accent);
     _spr.fillRect(0, 0, 160, 11, BLACK);
     _spr.setFont(&lgfx::fonts::Font0);
@@ -341,7 +345,7 @@ bool SceneNavigator::_renderExperienceTakeover(const UiFx& fx) {
     (void)fx;
     if (_experience.mode == ExperienceMode::NORMAL) return false;
 
-    const RockGameSnapshot& game = _experience.game;
+    const TrailGameSnapshot& game = _experience.game;
     drawNavWorld(_spr, game, _experience.identity.accent);
 
     _spr.fillRect(0, 0, 240, 29, BLACK);
@@ -359,11 +363,13 @@ bool SceneNavigator::_renderExperienceTakeover(const UiFx& fx) {
     _spr.fillRect(0, 220, 240, 20, BLACK);
     // Keep the status line short enough for the 240 px panel.
     if (_settings.language == UiLanguage::ITALIAN)
-        snprintf(text, sizeof(text), "VITE %u  X%u  ROCCE %u/%u",
-                 game.lives, game.combo, game.obstacle, game.total_obstacles);
+        snprintf(text, sizeof(text), "DANNI %u%%  CHECK %u/%u",
+                 game.damage_permille / 10, game.checkpoint,
+                 game.total_checkpoints);
     else
-        snprintf(text, sizeof(text), "LIVES %u  X%u  ROCKS %u/%u",
-                 game.lives, game.combo, game.obstacle, game.total_obstacles);
+        snprintf(text, sizeof(text), "DAMAGE %u%%  CHECK %u/%u",
+                 game.damage_permille / 10, game.checkpoint,
+                 game.total_checkpoints);
     centered(_spr, text, 120, 230, &lgfx::fonts::Font0, WHITE);
     drawNavOverlay(_spr, game, _experience, &_fonts.med, &_fonts.speed,
                    _settings.language);

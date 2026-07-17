@@ -77,8 +77,9 @@
 // ----------------------------------------------------------------
 // Frame-rate targets
 // ----------------------------------------------------------------
-#define DASH_FRAME_MS   33    // ~30 FPS  dashboard
-#define NAV_FRAME_MS    80    // ~12 FPS  navigator
+#define DASH_FRAME_MS   20    // ~50 FPS driver display
+#define NAV_FRAME_MS    20    // ~50 Hz scheduler; renderer naturally caps FPS
+#define GAME_NAV_FRAME_MS 20  // same pacing during Trail Assault
 
 // ----------------------------------------------------------------
 // Unit preferences
@@ -128,13 +129,13 @@
 // Animation & FX (tutte le durate in ms)
 // ----------------------------------------------------------------
 // Boot sequence — dash: logo → sweep RPM → check; nav parte sfasato
-#define BOOT_LOGO_MS         900
-#define BOOT_SWEEP_MS       1300
-#define BOOT_CHECK_MS        800
-#define BOOT_NAV_DELAY_MS    800
-#define BOOT_NAV_ACQ_MS     2400
-#define BOOT_NAV_LOCK_MS     600
-#define BOOT_TOTAL_MS       3800   // ≥ fine di entrambe le timeline
+#define BOOT_LOGO_MS         650
+#define BOOT_SWEEP_MS        900
+#define BOOT_CHECK_MS        450
+#define BOOT_NAV_DELAY_MS    300
+#define BOOT_NAV_ACQ_MS     1600
+#define BOOT_NAV_LOCK_MS     400
+#define BOOT_TOTAL_MS       2800   // target percepito: circa tre secondi
 
 // Shift light / redline
 #define REDLINE_RPM        6900.0f  // flash = rev limiter (7200)
@@ -154,10 +155,10 @@
 // Wow pass — smoothing, micro-vita, transizioni, compass tape
 // ----------------------------------------------------------------
 // Easing dei valori visualizzati (tau in ms; attack/release separati)
-#define SPEED_SMOOTH_MS      120.0f  // inseguimento velocità dash
-#define RPM_ATTACK_MS         60.0f  // barra RPM: salita scattante...
-#define RPM_RELEASE_MS       400.0f  // ...discesa lenta (VU meter)
-#define NAV_VALUE_SMOOTH_MS  150.0f  // valori navigator (12 FPS)
+#define SPEED_SMOOTH_MS       55.0f  // lettura pronta senza scatti numerici
+#define RPM_ATTACK_MS         28.0f  // risposta immediata in accelerazione
+#define RPM_RELEASE_MS        95.0f  // rientro rapido, senza effetto trascinato
+#define NAV_VALUE_SMOOTH_MS   70.0f  // coerente con il refresh ad alta frequenza
 #define SCROLL_MS            260     // slide scroll roadbook
 
 // Micro-vita (rumore deterministico, seedabile)
@@ -186,5 +187,5 @@
 // ----------------------------------------------------------------
 // Frame pacing / profiling
 // ----------------------------------------------------------------
-#define NAV_FRAME_SLOW_MS    120   // navigator rallentato durante FX dash
+#define NAV_FRAME_SLOW_MS     20   // alerts keep the same fluid pacing
 #define PROFILE_LOG_MS      5000   // report frame time su seriale

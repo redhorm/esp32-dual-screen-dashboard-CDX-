@@ -1,16 +1,8 @@
-// ============================================================
-// ESP32-S3 Dual Display — RC Ultra4 Dashboard + Waypoint Navigator
-//
-// Core 1 (Arduino loop): RaceController (sim+driver+roadbook)
-//                        + dashboard @ ~30 FPS (ST7735, SPI2)
-// Core 0 (FreeRTOS task): navigator @ ~12 FPS (ST7789, SPI3),
-//                         slowed to NAV_FRAME_SLOW_MS while the
-//                         dash runs flash-critical FX.
-// Separate SPI hosts → the two DMA pushes run truly in parallel.
-// No blocking delay() anywhere: loop() paces itself with millis(),
-// the navigator task with vTaskDelayUntil().
-// ============================================================
+// ESP32-S3 Ultra4 Microdash — production runtime
+// Core 1: deterministic simulation, portal and 30 FPS pilot display.
+// Core 0: 100 Hz safety/control I/O plus independent navigator rendering.
 #include <Arduino.h>
+#include <esp_heap_caps.h>
 #include "config.h"
 #include "hal/display_a.h"
 #include "hal/display_b.h"
@@ -18,193 +10,488 @@
 #include "core/roadbook.h"
 #include "core/race.h"
 #include "core/ui_settings.h"
+#include "core/ui_i18n.h"
 #include "core/experience.h"
 #include "core/rtl_logic.h"
+#include "core/diagnostics.h"
 #include "app/scene_dashboard.h"
 #include "app/scene_navigator.h"
 #include "hal/ws2812_rtl.h"
 #include "hal/esc_pwm_input.h"
 #include "services/config_portal.h"
 
-static LGFX_DisplayA   dispA;
-static LGFX_DisplayB   dispB;
-static Simulator       sim;
-static Roadbook        roadbook;
-static RaceController  race;
+static LGFX_DisplayA dispA;
+static LGFX_DisplayB dispB;
+static Simulator sim;
+static Roadbook roadbook;
+static RaceController race;
 static ExperienceEngine experience;
-static RtlLogic        rtl(RtlProfile::ULTRA4_4400, RTL_LED_COUNT,
-                           RTL_COMMAND_TIMEOUT_MS);
-static Ws2812Rtl       rtlHardware;
-static EscPwmInput     escPwm;
-static SceneDashboard  dash(dispA);
-static SceneNavigator  nav(dispB, roadbook);
-static ConfigPortal    portal(experience, rtl, rtlHardware, escPwm);
+static DiagnosticsRegistry diagnostics;
+static RtlLogic rtl(RtlProfile::ULTRA4_4400, RTL_LED_COUNT,
+                    RTL_COMMAND_TIMEOUT_MS);
+static Ws2812Rtl rtlHardware;
+static EscPwmInput escPwm;
+static SceneDashboard dash(dispA);
+static SceneNavigator nav(dispB, roadbook);
+static ConfigPortal portal(experience, rtl, rtlHardware, escPwm, diagnostics);
 
-// ── Shared frame (written by core 1, read by the nav task) ──────────────────
+static bool dashReady = false;
+static bool navReady = false;
+static bool navTaskStarted = false;
+static bool controlTaskStarted = false;
+static volatile uint32_t dashHeartbeatMs = 0;
+static volatile uint32_t navHeartbeatMs = 0;
+static volatile uint32_t controlHeartbeatMs = 0;
+static volatile uint32_t dashStackFreeBytes = 0;
+static volatile uint32_t navStackFreeBytes = 0;
+static volatile uint32_t controlStackFreeBytes = 0;
+
 struct SharedFrame {
-    VehicleState s;
-    UiFx         fx;
-    RunStats     stats;
-    UiSettings   settings;
+    VehicleState state;
+    UiFx fx;
+    RunStats stats;
+    UiSettings settings;
     ExperienceFrame experience;
     bool portal_credentials_visible = true;
 };
-static SharedFrame  shared;
-static portMUX_TYPE shareMux = portMUX_INITIALIZER_UNLOCKED;
 
-// ── Frame-time profiling (avg/max, reported every PROFILE_LOG_MS) ───────────
-struct Prof {
-    uint32_t n = 0, sum_us = 0, max_us = 0;
-    void add(uint32_t us) { n++; sum_us += us; if (us > max_us) max_us = us; }
-    uint32_t avg() const { return n ? sum_us / n : 0; }
-    void reset() { n = sum_us = max_us = 0; }
+// Sequence lock: the single writer never blocks either display task, while a
+// reader retries if it observes an in-progress copy.  The frame is immutable
+// for the remainder of each renderer pass.
+static SharedFrame sharedFrame;
+static volatile uint32_t sharedSequence = 0;
+
+static void publishSharedFrame(const SharedFrame& frame) {
+    ++sharedSequence;  // odd: write in progress
+    __sync_synchronize();
+    sharedFrame = frame;
+    __sync_synchronize();
+    ++sharedSequence;  // even: stable snapshot
+}
+
+static SharedFrame readSharedFrame() {
+    SharedFrame frame;
+    for (;;) {
+        const uint32_t before = sharedSequence;
+        if (before & 1u) {
+            taskYIELD();
+            continue;
+        }
+        __sync_synchronize();
+        frame = sharedFrame;
+        __sync_synchronize();
+        const uint32_t after = sharedSequence;
+        if (before == after && !(after & 1u)) return frame;
+    }
+}
+
+struct Profiler {
+    uint32_t samples = 0;
+    uint64_t sum_us = 0;
+    uint32_t max_us = 0;
+
+    void add(uint32_t microseconds) {
+        ++samples;
+        sum_us += microseconds;
+        if (microseconds > max_us) max_us = microseconds;
+    }
+    uint32_t average() const {
+        return samples ? static_cast<uint32_t>(sum_us / samples) : 0u;
+    }
+    void reset() {
+        samples = 0;
+        sum_us = 0;
+        max_us = 0;
+    }
 };
-static Prof dashRender, dashPush;
-// Nav task publishes its window results here (plain 32-bit reads are atomic)
-static volatile uint32_t navRenderAvg = 0, navRenderMax = 0;
-static volatile uint32_t navPushAvg = 0, navPushMax = 0;
-static volatile uint32_t navFps = 0;
 
-static void navTask(void*) {
-    Prof render, push;
-    uint32_t frames = 0, win_t0 = millis();
-    uint8_t prev_brightness = 0;
-    TickType_t last = xTaskGetTickCount();
+static DisplayDiagnostics pendingNavProfile;
+static bool navProfilePending = false;
+static portMUX_TYPE navProfileMux = portMUX_INITIALIZER_UNLOCKED;
+
+static void publishNavProfile(const DisplayDiagnostics& profile) {
+    taskENTER_CRITICAL(&navProfileMux);
+    pendingNavProfile = profile;
+    navProfilePending = true;
+    taskEXIT_CRITICAL(&navProfileMux);
+}
+
+static void importNavProfile() {
+    DisplayDiagnostics profile;
+    bool pending;
+    taskENTER_CRITICAL(&navProfileMux);
+    pending = navProfilePending;
+    if (pending) {
+        profile = pendingNavProfile;
+        navProfilePending = false;
+    }
+    taskEXIT_CRITICAL(&navProfileMux);
+    if (pending)
+        diagnostics.publishDisplayWindow(DiagnosticDisplay::NAVIGATOR, profile);
+}
+
+static void drawEarlyLogo() {
+    constexpr uint16_t black = 0x0000;
+    constexpr uint16_t amber = 0xFD20;
+    constexpr uint16_t white = 0xFFFF;
+    dispA.fillScreen(black);
+    dispA.setTextDatum(lgfx::MC_DATUM);
+    dispA.setFont(&lgfx::fonts::Font2);
+    dispA.setTextColor(white, black);
+    dispA.drawString("ULTRA4", 80, 27);
+    dispA.setTextColor(amber, black);
+    dispA.drawString("MICRODASH", 80, 48);
+    dispA.drawFastHLine(25, 64, 110, amber);
+
+    dispB.fillScreen(black);
+    dispB.setTextDatum(lgfx::MC_DATUM);
+    dispB.setFont(&lgfx::fonts::Font4);
+    dispB.setTextColor(white, black);
+    dispB.drawString("ULTRA4", 120, 82);
+    dispB.setTextColor(amber, black);
+    dispB.drawString("MICRODASH", 120, 116);
+    dispB.setFont(&lgfx::fonts::Font2);
+    dispB.drawString("DUAL SCREEN CONTROL SYSTEM", 120, 151);
+    dispB.drawFastHLine(34, 174, 172, amber);
+}
+
+static void drawBootHealth(bool ap_ok, UiLanguage language) {
+    constexpr uint16_t black = 0x0000;
+    constexpr uint16_t panel = 0x18E3;
+    constexpr uint16_t amber = 0xFD20;
+    constexpr uint16_t green = 0x4E48;
+    constexpr uint16_t red = 0xF800;
+    constexpr uint16_t white = 0xFFFF;
+    constexpr uint16_t muted = 0x7BEF;
+    const bool fs_ok = photoStore.ready();
+    const bool psram_ok = psramFound();
+    const bool rtl_ok = rtlHardware.ready();
+
+    dispA.fillScreen(black);
+    dispA.fillRect(0, 0, 160, 16, amber);
+    dispA.setTextDatum(lgfx::MC_DATUM);
+    dispA.setFont(&lgfx::fonts::Font2);
+    dispA.setTextColor(black, amber);
+    dispA.drawString(uiText(language, "CONTROLLO", "SYSTEM CHECK"), 80, 8);
+    dispA.setFont(&lgfx::fonts::Font0);
+    dispA.setTextColor(dashReady ? green : red, black);
+    dispA.drawString(dashReady ? "DISPLAY A  OK" :
+                     uiText(language, "DISPLAY A GUASTO", "DISPLAY A  FAIL"),
+                     80, 31);
+    dispA.setTextColor(fs_ok ? green : red, black);
+    dispA.drawString(fs_ok ? "MEDIA      OK" : "MEDIA      OFF", 80, 46);
+    dispA.setTextColor(ap_ok ? green : red, black);
+    dispA.drawString(ap_ok ? uiText(language, "RETE AP     OK", "ACCESS POINT OK") :
+                     uiText(language, "RETE AP     OFF", "ACCESS POINT OFF"),
+                     80, 61);
+
+    dispB.fillScreen(black);
+    dispB.fillRect(0, 0, 240, 32, amber);
+    dispB.setTextDatum(lgfx::MC_DATUM);
+    dispB.setFont(&lgfx::fonts::Font4);
+    dispB.setTextColor(black, amber);
+    dispB.drawString(uiText(language, "CONTROLLO SISTEMA", "SYSTEM CHECK"),
+                     120, 16);
+    struct HealthRow { const char* name; const char* value; uint16_t color; };
+    const HealthRow rows[] = {
+        {"DISPLAY A", dashReady ? uiText(language, "PRONTO", "READY") :
+                                  uiText(language, "GUASTO", "FAILED"),
+         dashReady ? green : red},
+        {"DISPLAY B", navReady ? uiText(language, "PRONTO", "READY") :
+                                 uiText(language, "GUASTO", "FAILED"),
+         navReady ? green : red},
+        {"LITTLEFS", fs_ok ? uiText(language, "PRONTO", "READY") : "MEDIA OFF",
+         fs_ok ? green : red},
+        {"PSRAM", psram_ok ? uiText(language, "PRONTA", "READY") :
+                             uiText(language, "OPZIONALE", "OPTIONAL"),
+         psram_ok ? green : muted},
+        {"RTL", rtl_ok ? uiText(language, "PRONTA", "READY") :
+                         uiText(language, "DISATTIVA", "OFFLINE"),
+         rtl_ok ? green : red},
+        {uiText(language, "INGRESSO ESC", "ESC INPUT"),
+         escPwm.enabled() ? uiText(language, "ATTIVO", "ENABLED") :
+                            uiText(language, "SICURO / OFF", "SAFE / OFF"),
+         amber},
+    };
+    dispB.setFont(&lgfx::fonts::Font2);
+    for (uint8_t index = 0; index < sizeof(rows) / sizeof(rows[0]); ++index) {
+        const int y = 43 + index * 31;
+        dispB.fillRoundRect(8, y, 224, 25, 4, panel);
+        dispB.setTextDatum(lgfx::ML_DATUM);
+        dispB.setTextColor(white, panel);
+        dispB.drawString(rows[index].name, 16, y + 12);
+        dispB.setTextDatum(lgfx::MR_DATUM);
+        dispB.setTextColor(rows[index].color, panel);
+        dispB.drawString(rows[index].value, 224, y + 12);
+    }
+    dispA.setTextDatum(lgfx::TL_DATUM);
+    dispB.setTextDatum(lgfx::TL_DATUM);
+}
+
+static void controlTask(void*) {
+    TickType_t last_wake = xTaskGetTickCount();
+    uint16_t stack_sample = 0;
+    for (;;) {
+        portal.controlIoTick();
+        controlHeartbeatMs = millis();
+        if (++stack_sample >= 100u) {
+            stack_sample = 0;
+            controlStackFreeBytes = uxTaskGetStackHighWaterMark(nullptr) *
+                                    sizeof(StackType_t);
+        }
+        vTaskDelayUntil(&last_wake, pdMS_TO_TICKS(10));
+    }
+}
+
+static void navigatorTask(void*) {
+    Profiler frame_profile;
+    Profiler render_profile;
+    Profiler push_profile;
+    uint32_t frames = 0;
+    uint32_t window_started = millis();
+    uint8_t previous_brightness = 0;
+    TickType_t last_wake = xTaskGetTickCount();
 
     for (;;) {
-        SharedFrame f;
-        taskENTER_CRITICAL(&shareMux);
-        f = shared;
-        taskEXIT_CRITICAL(&shareMux);
-
-        if (DISP_B_BL >= 0 && f.settings.navigator_brightness != prev_brightness) {
-            dispB.setBrightness(f.settings.navigator_brightness);
-            prev_brightness = f.settings.navigator_brightness;
+        const SharedFrame frame = readSharedFrame();
+        if (DISP_B_BL >= 0 &&
+            frame.settings.navigator_brightness != previous_brightness) {
+            dispB.setBrightness(frame.settings.navigator_brightness);
+            previous_brightness = frame.settings.navigator_brightness;
         }
 
-        uint32_t t0 = micros();
-        nav.setSettings(f.settings);
-        nav.setExperienceFrame(f.experience);
-        nav.setPortalCredentials(f.portal_credentials_visible,
+        const uint32_t started_us = micros();
+        nav.setSettings(frame.settings);
+        nav.setExperienceFrame(frame.experience);
+        nav.setPortalCredentials(frame.portal_credentials_visible,
                                  portal.ssidString(), portal.passwordString());
-        nav.render(f.s, f.fx, f.stats);
-        uint32_t t1 = micros();
+        nav.render(frame.state, frame.fx, frame.stats);
+        const uint32_t rendered_us = micros();
         nav.push();
-        uint32_t t2 = micros();
-        render.add(t1 - t0);
-        push.add(t2 - t1);
-        frames++;
+        const uint32_t pushed_us = micros();
+        navHeartbeatMs = millis();
+        render_profile.add(rendered_us - started_us);
+        push_profile.add(pushed_us - rendered_us);
+        frame_profile.add(pushed_us - started_us);
+        ++frames;
 
-        uint32_t now = millis();
-        if (now - win_t0 >= PROFILE_LOG_MS) {
-            navRenderAvg = render.avg();  navRenderMax = render.max_us;
-            navPushAvg   = push.avg();    navPushMax   = push.max_us;
-            navFps       = frames * 1000 / (now - win_t0);
-            render.reset(); push.reset();
-            frames = 0; win_t0 = now;
+        const uint32_t now = millis();
+        if (now - window_started >= PROFILE_LOG_MS) {
+            DisplayDiagnostics profile;
+            profile.ok = navReady;
+            profile.fps = frames * 1000u / (now - window_started);
+            profile.window_frames = frames;
+            profile.frame_avg_us = frame_profile.average();
+            profile.frame_max_us = frame_profile.max_us;
+            profile.render_avg_us = render_profile.average();
+            profile.render_max_us = render_profile.max_us;
+            profile.push_avg_us = push_profile.average();
+            profile.push_max_us = push_profile.max_us;
+            publishNavProfile(profile);
+            navStackFreeBytes = uxTaskGetStackHighWaterMark(nullptr) *
+                                sizeof(StackType_t);
+            frame_profile.reset();
+            render_profile.reset();
+            push_profile.reset();
+            frames = 0;
+            window_started = now;
         }
 
-        // Yield the wall clock to the dash during flash-critical FX
-        bool fx_critical = f.fx.phase == Phase::LIVE
-                        && (f.fx.redline || f.fx.alert);
-        uint32_t period = fx_critical ? NAV_FRAME_SLOW_MS : NAV_FRAME_MS;
-        vTaskDelayUntil(&last, pdMS_TO_TICKS(period));
+        const bool flash_critical = frame.fx.phase == Phase::LIVE &&
+            (frame.fx.redline || frame.fx.alert);
+        uint32_t period = flash_critical ? NAV_FRAME_SLOW_MS : NAV_FRAME_MS;
+        if (frame.experience.mode == ExperienceMode::GAME)
+            period = GAME_NAV_FRAME_MS;
+        vTaskDelayUntil(&last_wake, pdMS_TO_TICKS(period));
     }
+}
+
+static void publishSlowDiagnostics(uint32_t now) {
+    DiagnosticsSlowHealth health;
+    const uint32_t dash_age = dashHeartbeatMs
+        ? now - dashHeartbeatMs : UINT32_MAX;
+    const uint32_t nav_age = navHeartbeatMs
+        ? now - navHeartbeatMs : UINT32_MAX;
+    const uint32_t control_age = controlHeartbeatMs
+        ? now - controlHeartbeatMs : UINT32_MAX;
+    health.driver_ok = dashReady && dash_age < 500u;
+    health.navigator_ok = navReady && navTaskStarted && nav_age < 500u;
+    health.driver_heartbeat_age_ms = dash_age;
+    health.navigator_heartbeat_age_ms = nav_age;
+    health.driver_stack_free_bytes = dashStackFreeBytes;
+    health.navigator_stack_free_bytes = navStackFreeBytes;
+    health.memory.heap_free_bytes = ESP.getFreeHeap();
+    health.memory.heap_min_free_bytes = ESP.getMinFreeHeap();
+    health.memory.heap_largest_block_bytes =
+        heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
+    health.memory.psram_present = psramFound();
+    if (health.memory.psram_present) {
+        health.memory.psram_total_bytes = ESP.getPsramSize();
+        health.memory.psram_free_bytes = ESP.getFreePsram();
+    }
+    portal.fillDiagnosticsSlowHealth(health);
+    health.output.control_alive = control_age < 250u;
+    health.output.control_age_ms = control_age;
+    health.output.control_stack_free_bytes = controlStackFreeBytes;
+    if (!health.output.control_alive)
+        health.last_error = "control_task_stalled";
+    diagnostics.publishSlowHealth(now, health);
 }
 
 void setup() {
     Serial.begin(115200);
+    diagnostics.reset(millis());
+    diagnostics.setIdentity(EXPERIENCE_VERSION, 4);
 
-    bool ap_ok = portal.begin();
+    // Allocate the two DMA-friendly internal framebuffers before Wi-Fi and
+    // LittleFS fragment the heap.  A failure degrades one display only.
+    dispA.init();
+    dispB.init();
+    drawEarlyLogo();
+    dashReady = dash.init();
+    navReady = nav.init();
+
+    const bool ap_ok = portal.begin();
     Serial.printf("[portal] AP %s | SSID=%s | http://%s\n",
                   ap_ok ? "ready" : "failed", portal.ssidString(),
                   portal.ipString());
 
-    dispA.init();
-    dispB.init();
-    const UiSettings& settings = portal.settings();
+    const UiSettings settings = portal.settings();
     if (DISP_A_BL >= 0) dispA.setBrightness(settings.driver_brightness);
     if (DISP_B_BL >= 0) dispB.setBrightness(settings.navigator_brightness);
-
-    dash.init();
-    nav.init();
     pinMode(CONFIG_AP_REVEAL_PIN, INPUT_PULLUP);
     sim.reset();
     roadbook.reset();
-    race.reset(millis());
-    experience.reset(millis());
-    shared.settings = settings;
-    shared.portal_credentials_visible = true;
+    const uint32_t now = millis();
+    race.reset(now);
+    experience.reset(now);
 
-    xTaskCreatePinnedToCore(navTask, "nav", 8192, nullptr, 1, nullptr, 0);
+    SharedFrame initial;
+    initial.state = sim.state;
+    initial.fx = race.fx();
+    initial.stats = race.stats();
+    initial.settings = settings;
+    initial.experience = experience.frame(now, false);
+    initial.portal_credentials_visible = true;
+    publishSharedFrame(initial);
+
+    TaskHandle_t control_handle = nullptr;
+    controlTaskStarted = xTaskCreatePinnedToCore(
+        controlTask, "control-io", 4096, nullptr, 3,
+        &control_handle, 0) == pdPASS;
+    if (!controlTaskStarted)
+        diagnostics.setLastError("control_task_start_failed");
+
+    drawBootHealth(ap_ok, settings.language);
+    vTaskDelay(pdMS_TO_TICKS(240));
+
+    if (navReady) {
+        TaskHandle_t nav_handle = nullptr;
+        navTaskStarted = xTaskCreatePinnedToCore(
+            navigatorTask, "navigator", 8192, nullptr, 1,
+            &nav_handle, 0) == pdPASS;
+        if (!navTaskStarted)
+            diagnostics.setLastError("navigator_task_start_failed");
+    }
+    publishSlowDiagnostics(millis());
 }
 
 void loop() {
-    static uint32_t last_frame = 0;
-    static uint32_t frames = 0, win_t0 = 0;
+    static uint32_t last_frame_ms = 0;
+    static uint32_t last_health_ms = 0;
+    static uint32_t last_control_fallback_ms = 0;
+    static uint32_t profile_window_ms = 0;
+    static uint32_t profile_dash_frames = 0;
 
     portal.handle();
-
     uint32_t now = millis();
-    if (now - last_frame < DASH_FRAME_MS) return;
-    last_frame = now;
+    experience.update(now, sim.state, race.fx());
+    importNavProfile();
+
+    if (!controlTaskStarted && now - last_control_fallback_ms >= 10u) {
+        last_control_fallback_ms = now;
+        portal.controlIoTick();
+        controlHeartbeatMs = now;
+    }
+    if (now - last_health_ms >= 1000u) {
+        last_health_ms = now;
+        publishSlowDiagnostics(now);
+    }
+
+    if (now - last_frame_ms < DASH_FRAME_MS) {
+        vTaskDelay(1);
+        return;
+    }
+    last_frame_ms = now;
 
     const UiSettings settings = portal.settings();
-    static uint8_t prev_dash_brightness = 0;
-    if (DISP_A_BL >= 0 && settings.driver_brightness != prev_dash_brightness) {
+    static uint8_t previous_dash_brightness = 0;
+    if (DISP_A_BL >= 0 &&
+        settings.driver_brightness != previous_dash_brightness) {
         dispA.setBrightness(settings.driver_brightness);
-        prev_dash_brightness = settings.driver_brightness;
+        previous_dash_brightness = settings.driver_brightness;
     }
 
     race.update(now, sim, roadbook);
     experience.update(now, sim.state, race.fx());
-    const ExperienceFrame experience_frame = experience.frame(now);
-    const bool show_portal_credentials = !portal.setupComplete() ||
+    const ExperienceFrame experience_frame = experience.frame(now, false);
+    const bool show_credentials = !portal.setupComplete() ||
         digitalRead(CONFIG_AP_REVEAL_PIN) == LOW;
 
-    taskENTER_CRITICAL(&shareMux);
-    shared.s     = sim.state;
-    shared.fx    = race.fx();
-    shared.stats = race.stats();
-    shared.settings = settings;
-    shared.experience = experience_frame;
-    shared.portal_credentials_visible = show_portal_credentials;
-    taskEXIT_CRITICAL(&shareMux);
+    SharedFrame frame;
+    frame.state = sim.state;
+    frame.fx = race.fx();
+    frame.stats = race.stats();
+    frame.settings = settings;
+    frame.experience = experience_frame;
+    frame.portal_credentials_visible = show_credentials;
+    publishSharedFrame(frame);
 
-    uint32_t t0 = micros();
+    const uint32_t started_us = micros();
     dash.setSettings(settings);
     dash.setExperienceFrame(experience_frame);
-    dash.setPortalCredentials(show_portal_credentials, portal.ssidString(),
+    dash.setPortalCredentials(show_credentials, portal.ssidString(),
                               portal.passwordString());
     dash.render(sim.state, race.fx(), race.stats());
-    uint32_t t1 = micros();
+    const uint32_t rendered_us = micros();
     dash.push();
-    uint32_t t2 = micros();
-    dashRender.add(t1 - t0);
-    dashPush.add(t2 - t1);
-    frames++;
-
-    if (now - win_t0 >= PROFILE_LOG_MS) {
-        if (win_t0 != 0) {
-            uint32_t fps = frames * 1000 / (now - win_t0);
+    ++profile_dash_frames;
+    const uint32_t pushed_us = micros();
+    dashHeartbeatMs = now;
+    dashStackFreeBytes = uxTaskGetStackHighWaterMark(nullptr) *
+                         sizeof(StackType_t);
+    diagnostics.recordFrame(DiagnosticDisplay::DRIVER, now,
+                            pushed_us - started_us,
+                            rendered_us - started_us,
+                            pushed_us - rendered_us);
+    if (now - profile_window_ms >= PROFILE_LOG_MS) {
+        const DisplayDiagnostics dash_profile =
+            diagnostics.resetFrameWindow(DiagnosticDisplay::DRIVER, now);
+        const DiagnosticsSnapshot& report = diagnostics.snapshot();
+        const uint32_t profile_elapsed = now - profile_window_ms;
+        const uint32_t measured_dash_fps = profile_window_ms && profile_elapsed
+            ? profile_dash_frames * 1000u / profile_elapsed : 0u;
+        if (profile_window_ms != 0) {
             Serial.printf(
-                "[prof] dash %2u FPS render %lu/%lu us push %lu/%lu us | "
-                "nav %2u FPS render %lu/%lu us push %lu/%lu us | "
-                "heap %u KB | "
-                "spd=%.0f rpm=%.0f gear=%d wp=%d odo=%.2f phase=%d\n",
-                (unsigned)fps,
-                (unsigned long)dashRender.avg(), (unsigned long)dashRender.max_us,
-                (unsigned long)dashPush.avg(),   (unsigned long)dashPush.max_us,
-                (unsigned)navFps,
-                (unsigned long)navRenderAvg, (unsigned long)navRenderMax,
-                (unsigned long)navPushAvg,   (unsigned long)navPushMax,
-                (unsigned)(esp_get_free_heap_size() / 1024),
-                sim.state.speed_mph, sim.state.rpm, sim.state.gear,
-                sim.state.active_wp, sim.state.odo_mi, (int)race.fx().phase);
+                "[prof] dash %lu FPS render %lu/%lu us push %lu/%lu us | "
+                "nav %lu FPS render %lu/%lu us push %lu/%lu us | "
+                "heap %lu KB min %lu KB | game tick=%lu status=%u\n",
+                static_cast<unsigned long>(measured_dash_fps),
+                static_cast<unsigned long>(dash_profile.render_avg_us),
+                static_cast<unsigned long>(dash_profile.render_max_us),
+                static_cast<unsigned long>(dash_profile.push_avg_us),
+                static_cast<unsigned long>(dash_profile.push_max_us),
+                static_cast<unsigned long>(report.navigator.fps),
+                static_cast<unsigned long>(report.navigator.render_avg_us),
+                static_cast<unsigned long>(report.navigator.render_max_us),
+                static_cast<unsigned long>(report.navigator.push_avg_us),
+                static_cast<unsigned long>(report.navigator.push_max_us),
+                static_cast<unsigned long>(report.memory.heap_free_bytes / 1024u),
+                static_cast<unsigned long>(report.memory.heap_min_free_bytes / 1024u),
+                static_cast<unsigned long>(experience_frame.game.tick),
+                static_cast<unsigned>(experience_frame.game.status));
         }
-        dashRender.reset();
-        dashPush.reset();
-        frames = 0;
-        win_t0 = now;
+        profile_dash_frames = 0;
+        profile_window_ms = now;
     }
 }

@@ -27,12 +27,48 @@ void EscSignalProcessor::configure(const EscSignalConfig& config) {
     if (_config.exit_threshold < 0.0f) _config.exit_threshold = 0.0f;
     if (_config.exit_threshold >= _config.enter_threshold)
         _config.exit_threshold = _config.enter_threshold * 0.5f;
+    if (_config.forward_enter_threshold <= 0.0f)
+        _config.forward_enter_threshold = _config.enter_threshold;
+    if (_config.reverse_enter_threshold <= 0.0f)
+        _config.reverse_enter_threshold = _config.enter_threshold;
+    if (_config.forward_exit_threshold < 0.0f)
+        _config.forward_exit_threshold = _config.exit_threshold;
+    if (_config.reverse_exit_threshold < 0.0f)
+        _config.reverse_exit_threshold = _config.exit_threshold;
+    _config.forward_enter_threshold = minf(0.90f,
+        maxf(0.005f, _config.forward_enter_threshold));
+    _config.reverse_enter_threshold = minf(0.90f,
+        maxf(0.005f, _config.reverse_enter_threshold));
+    _config.forward_exit_threshold = maxf(0.0f,
+        minf(_config.forward_enter_threshold * 0.95f,
+             _config.forward_exit_threshold));
+    _config.reverse_exit_threshold = maxf(0.0f,
+        minf(_config.reverse_enter_threshold * 0.95f,
+             _config.reverse_exit_threshold));
     if (_config.max_slew_per_second < 0.1f)
         _config.max_slew_per_second = 0.1f;
     if (_config.reverse_arm_timeout_ms < _config.reverse_confirm_ms)
         _config.reverse_arm_timeout_ms = _config.reverse_confirm_ms;
 
     reset(0);
+}
+
+void EscSignalProcessor::configureDeadbandUs(EscSignalConfig& config,
+                                             uint16_t deadband_us) {
+    const uint16_t forward_span = config.forward_us > config.neutral_us
+        ? config.forward_us - config.neutral_us : 1u;
+    const uint16_t reverse_span = config.neutral_us > config.reverse_us
+        ? config.neutral_us - config.reverse_us : 1u;
+    config.forward_enter_threshold = minf(0.90f, maxf(0.005f,
+        static_cast<float>(deadband_us) / static_cast<float>(forward_span)));
+    config.reverse_enter_threshold = minf(0.90f, maxf(0.005f,
+        static_cast<float>(deadband_us) / static_cast<float>(reverse_span)));
+    config.forward_exit_threshold = config.forward_enter_threshold * 0.55f;
+    config.reverse_exit_threshold = config.reverse_enter_threshold * 0.55f;
+    config.enter_threshold = maxf(config.forward_enter_threshold,
+                                  config.reverse_enter_threshold);
+    config.exit_threshold = maxf(config.forward_exit_threshold,
+                                 config.reverse_exit_threshold);
 }
 
 void EscSignalProcessor::reset(uint32_t now_ms) {
@@ -67,14 +103,14 @@ EscSignalProcessor::Band EscSignalProcessor::classify(float value) {
     // direction releases at the smaller exit threshold.  This is the key
     // anti-chatter boundary around neutral.
     if (_band == Band::FORWARD) {
-        if (value <= -_config.enter_threshold) _band = Band::REVERSE;
-        else if (value < _config.exit_threshold) _band = Band::NEUTRAL;
+        if (value <= -_config.reverse_enter_threshold) _band = Band::REVERSE;
+        else if (value < _config.forward_exit_threshold) _band = Band::NEUTRAL;
     } else if (_band == Band::REVERSE) {
-        if (value >= _config.enter_threshold) _band = Band::FORWARD;
-        else if (value > -_config.exit_threshold) _band = Band::NEUTRAL;
+        if (value >= _config.forward_enter_threshold) _band = Band::FORWARD;
+        else if (value > -_config.reverse_exit_threshold) _band = Band::NEUTRAL;
     } else {
-        if (value >= _config.enter_threshold) _band = Band::FORWARD;
-        else if (value <= -_config.enter_threshold) _band = Band::REVERSE;
+        if (value >= _config.forward_enter_threshold) _band = Band::FORWARD;
+        else if (value <= -_config.reverse_enter_threshold) _band = Band::REVERSE;
     }
     return _band;
 }

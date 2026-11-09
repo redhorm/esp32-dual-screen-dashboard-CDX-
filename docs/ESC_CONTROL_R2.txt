@@ -1,0 +1,19 @@
+stormDASH — 7.1.0-rc.3-esc
+Pilota 0,96″ 160×80 + copilota 1,14″ 240×135
+
+MODALITÀ ESC / RICEVITORE
+1. Tieni premuto BOOT per circa 2 secondi per visualizzare i dettagli Wi-Fi.
+2. Collegati alla rete indicata sul display e apri http://192.168.4.1.
+3. Apri LUCI > Configurazione avanzata PWM / ESC.
+4. Attiva “Modalità ESC: strumenti e luci dal gas”. Seleziona il tipo ESC corrispondente a quello configurato sul veicolo e salva con SALVA LUCI E MODALITÀ.
+5. Con segnale valido vedrai ESC; senza segnale ESC · ATTESA. La demo si attiva disabilitando la modalità PWM e salvando. Lo SHOW resta una dimostrazione volontaria.
+
+COLLEGAMENTO
+Leggi il segnale gas dal ricevitore (lo stesso diretto all’ESC), su GPIO 5, con massa GND comune. L’ingresso ESP32-S3 accetta solo livelli 3,3 V: non collegare il positivo BEC al GPIO e adatta il segnale se supera 3,3 V. GPIO 5 è esclusivamente un ingresso: questo firmware non comanda il motore.
+
+COSA CAMBIA
+Velocità scenografica, RPM e luci RPM seguono il gas. La retro viene mostrata soltanto quando la logica del tipo ESC selezionato la riconosce. In mancanza di PWM valido gli strumenti tornano a riposo, senza riprendere automaticamente la demo.
+Non sono misure reali di velocità o giri. Batteria, temperature, carburante e mappa non provengono da sensori. Il segnale PWM non contiene telemetria del motore.
+
+VERIFICA
+Controlla in pagina LUCI l’impulso PWM, il neutro e il tipo ESC. Per verificare la corrispondenza con il veicolo prova neutro, avanti, freno e retro con il modello fermo e le ruote libere da terra. Le prove software non sostituiscono questa verifica sul tuo ricevitore.

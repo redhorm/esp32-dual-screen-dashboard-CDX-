@@ -92,8 +92,10 @@ void Simulator::_updatePowertrain(float dt_s) {
     // RPM: blend engine speed from wheel speed + direct throttle blip
     float wheel_rpm = state.speed_mph * GEAR_RATIO[state.gear] * RPM_PER_MPH;
     float blip      = _throttle * 900.0f;
-    float target    = (_throttle > 0.05f) ? (wheel_rpm + blip)
-                                           : SIM_IDLE_RPM;
+    // A moving, engaged drivetrain still turns the engine when the throttle
+    // closes. Dropping straight to idle while braking made the instrument
+    // disagree with road speed and erased the visible downshift response.
+    float target = fmaxf(SIM_IDLE_RPM, wheel_rpm + blip);
     // Low-pass filter for smooth RPM, then deterministic jitter on top.
     // Last frame's jitter is stripped first so noise never accumulates
     // through the filter.

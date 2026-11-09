@@ -4,6 +4,8 @@
 // Shared vehicle state — written by Simulator, read by both scene renderers.
 // All fields are plain types so individual reads are word-atomic on ARM/Xtensa.
 struct VehicleState {
+    bool esc_controlled = false;
+    bool esc_signal_valid = false;
     // ── Powertrain ──────────────────────────────────────────────
     float   speed_mph    = 0.0f;   // 0 – 120
     float   rpm          = 800.0f; // 0 – 7200

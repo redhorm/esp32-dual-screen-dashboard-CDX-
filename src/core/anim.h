@@ -11,8 +11,9 @@ inline float clamp01(float t) {
 // Linear progress 0..1 of `now` inside [t0, t0+dur]
 inline float progress(uint32_t now, uint32_t t0, uint32_t dur) {
     if (dur == 0) return 1.0f;
-    if (now <= t0) return 0.0f;
-    return clamp01((float)(now - t0) / (float)dur);
+    const uint32_t elapsed = now - t0;
+    if (elapsed >= 0x80000000UL) return 0.0f;
+    return clamp01((float)elapsed / (float)dur);
 }
 
 // 50% duty square wave; true during the first half-period

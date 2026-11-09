@@ -1,0 +1,139 @@
+/* Pit modules. All colors and type inherit the portal design system. */
+#pitControls { color: var(--ink); padding-top: 8px; }
+#pitControls *, #pitControls *::before, #pitControls *::after { box-sizing: border-box; }
+#pitControls [hidden] { display: none !important; }
+#pitControls p { margin: 0 0 16px; }
+#pitControls h2, #pitControls h3 { margin: 0 0 16px; line-height: 1.15; letter-spacing: -.045em; }
+#pitControls h2 { font-size: 26px; font-weight: 600; }
+#pitControls h3 { font-size: 23px; font-weight: 550; }
+#pitControls .fine, #pitControls .explain, #pitControls .muted { color: var(--muted); font-size: 13px; line-height: 1.65; }
+#pitControls .eyebrow, #pitControls .module-index { display: block; color: var(--muted); font: 10px/1.6 var(--mono); letter-spacing: .1em; text-transform: uppercase; margin-bottom: 16px; }
+#pitControls .module-index { color: var(--accent); }
+#pitControls .pit-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 20px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 16px 0; margin-bottom: 48px; }
+#pitControls .pit-toolbar .actions { flex: 0 1 350px; }
+#pitControls .link { display: flex; align-items: center; gap: 9px; margin: 0; color: var(--muted); font: 10px/1.6 var(--mono); letter-spacing: .04em; }
+#pitControls .link::before { content: ''; width: 7px; height: 7px; border-radius: 50%; border: 1px solid var(--muted); flex-shrink: 0; }
+#pitControls .link.online::before { background: var(--ink); border-color: var(--ink); }
+#pitControls .pit-group { display: grid; grid-template-columns: 170px minmax(0, 1fr); gap: 32px; padding: 0 0 42px; margin: 0 0 42px; border-bottom: 1px solid var(--line); scroll-margin-top: 30px; }
+#pitControls .group-copy { padding-top: 5px; }
+#pitControls .group-copy h2 { font-size: 25px; margin-bottom: 13px; }
+#pitControls .pit-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+#pitControls .card { min-width: 0; margin: 0; padding: 26px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); box-shadow: none; }
+#pitControls .card-head { display: flex; gap: 13px; align-items: center; margin-bottom: 25px; }
+#pitControls .card-head > div:last-child { min-width: 0; }
+#pitControls .card-head h2 { margin: 0; font-size: 25px; overflow-wrap: anywhere; }
+#pitControls .card-head .eyebrow { font-size: 9px; margin-bottom: 5px; }
+#pitControls .card-icon { width: 42px; height: 42px; display: grid; place-items: center; flex-shrink: 0; border: 1px solid var(--line); border-radius: 50%; color: var(--ink); }
+#pitControls .card-icon svg { width: 22px; height: 22px; }
+#pitControls .grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; }
+#pitControls .row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+#pitControls .stack { display: grid; gap: 16px; }
+#pitControls .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+#pitControls .actions > * { flex: 1; min-width: 100px; }
+#pitControls .metric { padding: 18px 0; min-width: 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+#pitControls .metric small { display: block; color: var(--muted); font: 9px/1.6 var(--mono); letter-spacing: .04em; }
+#pitControls .metric strong { display: block; margin-top: 10px; font-size: clamp(18px, 2vw, 25px); line-height: 1.3; letter-spacing: -.045em; font-weight: 500; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+#pitControls .explain { margin: 20px 0 0; }
+#pitControls .pill { border: 1px solid var(--line); padding: 3px 8px; font: 9px/1.5 var(--mono); letter-spacing: .06em; color: var(--muted); border-radius: 4px; }
+#pitControls .pit-show-card h2 { margin-top: 22px; font-size: 29px; }
+#pitControls .pulse-line { display: grid; grid-template-columns: repeat(16, minmax(0, 1fr)); gap: 5px; padding: 22px 0; margin: 20px 0 8px; border-top: 1px dashed var(--line); border-bottom: 1px dashed var(--line); }
+#pitControls .pulse-line i { display: block; aspect-ratio: 1; border-radius: 50%; background: var(--surface-raised); border: 1px solid var(--line); }
+#pitControls .pulse-line i.lit { background: var(--ink); border-color: var(--ink); }
+#pitControls .pulse-line i.peak { background: var(--accent); border-color: var(--accent); }
+#pitControls .timeline { height: 2px; background: var(--line); overflow: hidden; margin: 20px 0 12px; }
+#pitControls .timeline i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .4s linear; }
+#pitControls .show { width: 100%; margin-top: 14px; }
+#pitControls .show.running { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+#pitControls button, #pitControls input, #pitControls select { font: inherit; min-width: 0; }
+#pitControls button, #pitControls select, #pitControls input, #pitControls a, #pitControls summary { touch-action: manipulation; }
+#pitControls button, #pitControls select, #pitControls input:not([type='range']):not([type='checkbox']) { min-height: 46px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface-raised); color: var(--ink); padding: 12px 14px; }
+#pitControls button { font-size: 11px; line-height: 1.45; font-weight: 650; letter-spacing: .035em; cursor: pointer; transition: background .16s, border-color .16s, transform .16s; }
+#pitControls button:hover { border-color: var(--muted); }
+#pitControls button:active { transform: translateY(1px); }
+#pitControls button:disabled { opacity: .4; cursor: not-allowed; transform: none; }
+#pitControls .primary { color: var(--bg); background: var(--ink); border-color: var(--ink); }
+#pitControls .primary:hover { opacity: .88; }
+#pitControls .save { margin-top: 24px; width: 100%; }
+#pitControls .wide { width: 100%; }
+#pitControls .grid > label, #pitControls .field { display: grid; gap: 10px; min-width: 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+#pitControls .field { margin-bottom: 18px; }
+#pitControls input, #pitControls select { width: 100%; font-size: 16px; }
+#pitControls input:not([type=checkbox]):not([type=range]), #pitControls select { border-color: var(--control-line); }
+#pitControls select { padding-right: 24px; text-overflow: ellipsis; }
+#pitControls input[type='range'] { min-height: 44px; padding: 0; border: 0; background: transparent; accent-color: var(--ink); cursor: pointer; }
+#pitControls input[type='file'] { max-width: 100%; font-size: 12px; padding: 8px; }
+#pitControls input::file-selector-button { padding: 7px; border: 0; border-radius: 5px; color: var(--bg); background: var(--ink); font: inherit; margin-right: 6px; }
+#pitControls input::placeholder { color: var(--muted); }
+#pitControls output { color: var(--ink); font-family: var(--mono); font-variant-numeric: tabular-nums; }
+#pitControls fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
+#pitControls fieldset:disabled { opacity: .65; }
+#pitControls .switch { display: flex !important; align-items: center; justify-content: space-between; min-height: 48px; gap: 12px; margin-bottom: 12px; font-size: 14px; line-height: 1.4; color: var(--ink); }
+#pitControls input[type='checkbox'] { appearance: none; -webkit-appearance: none; position: relative; width: 44px; height: 26px; margin: 0; border: 1px solid var(--line); border-radius: 20px; background: var(--surface-raised); flex: 0 0 44px; cursor: pointer; transition: background .16s; }
+#pitControls input[type='checkbox']::after { content: ''; position: absolute; width: 18px; height: 18px; top: 3px; left: 3px; border-radius: 50%; background: var(--muted); transition: transform .16s; }
+#pitControls input[type='checkbox']:checked { background: var(--accent); border-color: var(--accent); }
+#pitControls input[type='checkbox']:checked::after { background: var(--accent-ink); transform: translateX(18px); }
+#pitControls :is(button, input, select, summary, a):focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+#pitControls details { border-top: 1px solid var(--line); margin-top: 22px; }
+#pitControls details:first-child { border-top: 0; margin-top: 0; }
+#pitControls summary { list-style: none; padding: 20px 27px 20px 0; position: relative; cursor: pointer; font-size: 13px; line-height: 1.5; font-weight: 550; min-height: 52px; }
+#pitControls summary::-webkit-details-marker { display: none; }
+#pitControls summary::after { content: '+'; position: absolute; right: 1px; top: 17px; font: 21px/1.2 var(--mono); color: var(--muted); }
+#pitControls details[open] > summary::after { content: '−'; }
+#pitControls .esc-settings-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 30px; margin-top: 24px; }
+#pitControls .esc-calibration { border-left: 1px solid var(--line); padding-left: 30px; }
+#pitControls .esc-calibration .module-index { margin: 8px 0 12px; }
+#pitControls .esc-calibration > button { width: 100%; margin: 8px 0 16px; }
+#pitControls .esc-card > button { margin-top: 22px; }
+#pitControls #pit-fullThrottleCalibration { padding: 16px; border: 1px solid var(--line); border-left: 2px solid var(--accent); border-radius: 8px; background: var(--surface-raised); font-size: 13px; line-height: 1.6; }
+#pitControls #pit-fullThrottleCalibration p { margin: 0; }
+#pitControls .rtl { display: grid; grid-template-columns: repeat(16, minmax(0, 1fr)); gap: 4px; padding: 22px 0; margin: 20px 0; border-top: 1px dashed var(--line); border-bottom: 1px dashed var(--line); }
+#pitControls .rtl i { height: 18px; border-radius: 3px; background: var(--surface-raised); border: 1px solid var(--line); }
+#pitControls .commands { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
+#pitControls .commands button { font-size: 10px; padding: 12px 5px; min-height: 48px; }
+#pitControls .commands button.active { background: var(--ink); color: var(--bg); border-color: var(--ink); box-shadow: inset 0 -3px var(--accent); }
+#pitControls .divider { border: 0; border-top: 1px solid var(--line); margin: 24px 0; }
+#pitControls .status { font-size: 12px; line-height: 1.65; color: var(--muted); margin-top: 12px; overflow-wrap: anywhere; }
+#pitControls .status:empty { margin: 0; }
+#pitControls .status.error { color: var(--danger); padding-left: 10px; border-left: 2px solid var(--danger); }
+#pitControls .status.ok { color: var(--ink); }
+#pitControls #pit-diagnosticOutput { padding: 16px; margin: 0; background: var(--bg); color: var(--muted); border: 1px solid var(--line); border-radius: 8px; font: 11px/1.9 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+#pitControls #pit-bootPreview { display: block; width: min(100%, 330px); max-height: 150px; object-fit: contain; background: #000; border: 1px solid var(--line); border-radius: 8px; margin-bottom: 18px; }
+#pitControls .pit-service-footer { margin: -12px 0 32px; }
+#pitControls #pit-retryButton { margin: 16px 0; }
+#pitControls .firmware-link { display: inline-flex; min-height: 44px; align-items: center; justify-content: space-between; gap: 28px; margin-top: 16px; color: var(--ink); font-size: 12px; text-decoration: none; border-bottom: 1px solid var(--line); }
+#pitControls .firmware-link:hover { border-color: var(--accent); }
+@media (max-width: 1120px) {
+  #pitControls .pit-group { grid-template-columns: 1fr; gap: 20px; }
+  #pitControls .group-copy { max-width: 600px; }
+  #pitControls .group-copy h2 br { display: none; }
+  #pitControls .group-copy .module-index { margin-bottom: 10px; }
+  #pitControls .group-copy p { margin-bottom: 0; }
+}
+@media (max-width: 720px) {
+  #pitControls .pit-toolbar { align-items: stretch; flex-direction: column; gap: 16px; margin-bottom: 32px; }
+  #pitControls .pit-toolbar .actions { flex: auto; }
+  #pitControls .pit-group { gap: 18px; padding-bottom: 28px; margin-bottom: 30px; }
+  #pitControls .pit-grid { grid-template-columns: 1fr; gap: 14px; }
+  #pitControls .card { padding: 22px; }
+  #pitControls .esc-settings-grid { grid-template-columns: 1fr; gap: 24px; }
+  #pitControls .esc-calibration { padding: 24px 0 0; border-left: 0; border-top: 1px solid var(--line); }
+  #pitControls .metric strong { font-size: 23px; }
+  #pitControls .pulse-line { gap: 6px; }
+}
+@media (max-width: 360px) {
+  #pitControls .card { padding: 18px; }
+  #pitControls .grid { gap: 12px; }
+  #pitControls .card-head h2 { font-size: 23px; }
+  #pitControls .metric strong { font-size: 20px; }
+  #pitControls .metric small { font-size: 8px; }
+  #pitControls .commands { gap: 5px; }
+  #pitControls .commands button { font-size: 9px; }
+  #pitControls .pulse-line { gap: 4px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #pitControls *, #pitControls *::before, #pitControls *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}
+@media (forced-colors: active) {
+  #pitControls input[type='checkbox'] { appearance: auto; -webkit-appearance: auto; }
+  #pitControls input[type='checkbox']::after { display: none; }
+}

@@ -16,6 +16,12 @@
 #include "core/noise.h"
 #include "core/compass.h"
 #include "core/ui_settings.h"
+#include "core/experience.h"
+#include "core/rtl_logic.h"
+#include <type_traits>
+
+static_assert(std::is_trivially_copyable<RtlFrame>::value,
+              "RTL frame must remain safe for deterministic copies");
 
 void setUp() {}
 void tearDown() {}
@@ -345,6 +351,25 @@ static void test_race_full_lap_finish_and_restart() {
     TEST_ASSERT_TRUE(rc.stats().stage_ms < 5000);
 }
 
+static void test_external_startup_does_not_advance_demo_trip() {
+    Simulator sim; sim.reset();
+    Roadbook rb; rb.reset();
+    RaceController rc; rc.reset(0xfffff000U);
+    const uint32_t ready = 0x00002000U; // Startup spans a millis rollover.
+    rc.finishBoot(ready);
+    TEST_ASSERT_TRUE(rc.fx().phase == Phase::LIVE);
+    TEST_ASSERT_EQUAL_UINT32(0, rc.stats().stage_ms);
+    rc.update(ready, sim, rb);
+    TEST_ASSERT_FLOAT_WITHIN(.000001f, 0, sim.state.odo_mi);
+    TEST_ASSERT_EQUAL_UINT32(0, rc.stats().stage_ms);
+    rc.update(ready + 33, sim, rb);
+    TEST_ASSERT_EQUAL_UINT32(33, rc.stats().stage_ms);
+    rc.finishBoot(ready + 1000); // A duplicate completion cannot reset a run.
+    TEST_ASSERT_EQUAL_UINT32(33, rc.stats().stage_ms);
+    rc.update(ready + 66, sim, rb);
+    TEST_ASSERT_EQUAL_UINT32(66, rc.stats().stage_ms);
+}
+
 static void test_race_alert_near_danger_waypoint() {
     Simulator sim;  sim.reset();
     Roadbook rb;    rb.reset();
@@ -545,7 +570,7 @@ static void test_sim_battery_sags_and_recovers() {
     for (int i = 0; i < 30; i++) sim.update(33);
     float before = sim.state.battery_v;
 
-    sim.setInputs(1.0f, 0.0f);           // hammer the throttle 2 s
+    sim.setInputs(1.0f, 0.0f);           // hold full throttle for 2 s
     for (int i = 0; i < 60; i++) sim.update(33);
     float dipped = sim.state.battery_v;
     TEST_ASSERT_TRUE(before - dipped > 0.15f);   // visible sag
@@ -752,10 +777,10 @@ static void test_fmt_race_time() {
 // ── Runtime UI settings ──────────────────────────────────────────────
 
 static void test_ui_theme_sanitization() {
-    TEST_ASSERT_EQUAL_INT((int)UiTheme::CLASSIC_RALLY, (int)sanitizeTheme(0));
-    TEST_ASSERT_EQUAL_INT((int)UiTheme::TRAIL_TOPO, (int)sanitizeTheme(3));
-    TEST_ASSERT_EQUAL_INT((int)UiTheme::CLASSIC_RALLY, (int)sanitizeTheme(4));
-    TEST_ASSERT_EQUAL_STRING("Night Ops", themeName(UiTheme::NIGHT_OPS));
+    TEST_ASSERT_EQUAL_INT((int)UiTheme::RECOIL_TFT, (int)sanitizeTheme(0));
+    TEST_ASSERT_EQUAL_INT((int)UiTheme::RECOIL_TFT, (int)sanitizeTheme(1));
+    TEST_ASSERT_EQUAL_INT((int)UiTheme::RECOIL_TFT, (int)sanitizeTheme(3));
+    TEST_ASSERT_EQUAL_STRING("Realism", themeName(UiTheme::REALISM));
 }
 
 static void test_ui_numeric_clamps() {
@@ -765,6 +790,53 @@ static void test_ui_numeric_clamps() {
     TEST_ASSERT_EQUAL_UINT16(500, clampU16(1, 500, 3500));
     TEST_ASSERT_EQUAL_UINT16(1800, clampU16(1800, 500, 3500));
     TEST_ASSERT_EQUAL_UINT16(3500, clampU16(9000, 500, 3500));
+}
+
+static void test_rtl_profiles_priority_and_timeout() {
+    RtlLogic rtl(RtlProfile::ULTRA4_4400, 16, 1000);
+    RtlFrame safe = rtl.frame(0);
+    TEST_ASSERT_TRUE(safe.command_timed_out);
+    TEST_ASSERT_EQUAL_INT((int)RtlFunction::RUNNING, (int)safe.primary);
+    TEST_ASSERT_TRUE(safe.pixels[4].r > 0);  // mandatory amber marker
+
+    RtlCommandState command;
+    command.brake = true;
+    command.left = true;
+    command.reverse_work = true;
+    rtl.submit(command, 100);
+    RtlFrame active = rtl.frame(100);
+    TEST_ASSERT_FALSE(active.command_timed_out);
+    TEST_ASSERT_EQUAL_INT((int)RtlFunction::BRAKE, (int)active.primary);
+    TEST_ASSERT_EQUAL_UINT8(255, active.pixels[0].r);
+    TEST_ASSERT_EQUAL_UINT8(255, active.pixels[7].r);
+    TEST_ASSERT_EQUAL_UINT8(255, active.pixels[7].g);
+    TEST_ASSERT_TRUE(rtl.frame(1101).command_timed_out);
+}
+
+static void test_rtl_count_clamp_and_wrap_keepalive() {
+    RtlLogic rtl(RtlProfile::RTL_S, 2, 500);
+    TEST_ASSERT_EQUAL_UINT16(RTL_LOGIC_MIN_PIXELS, rtl.ledCount());
+    rtl.activate(RtlFunction::HAZARD, UINT32_MAX - 200);
+    TEST_ASSERT_FALSE(rtl.frame(100).command_timed_out);
+    TEST_ASSERT_TRUE(rtl.frame(301).command_timed_out);
+    rtl.configure(RtlProfile::RTL_S, 200, 500);
+    TEST_ASSERT_EQUAL_UINT16(RTL_LOGIC_MAX_PIXELS, rtl.ledCount());
+}
+
+static void test_sim_coasting_keeps_engine_coupled_to_road_speed() {
+    Simulator sim;
+    sim.reset();
+    sim.setInputs(1.0f, 0.0f);
+    for (int i = 0; i < 80; ++i) sim.update(100);
+    TEST_ASSERT_GREATER_THAN_FLOAT(30.0f, sim.state.speed_mph);
+    sim.setInputs(0.0f, 0.0f);
+    for (int i = 0; i < 20; ++i) sim.update(100);
+    TEST_ASSERT_GREATER_THAN_FLOAT(30.0f, sim.state.speed_mph);
+    TEST_ASSERT_GREATER_THAN_FLOAT(2000.0f, sim.state.rpm);
+    sim.setInputs(0.0f, 1.0f);
+    for (int i = 0; i < 100; ++i) sim.update(100);
+    TEST_ASSERT_FLOAT_WITHIN(0.01f, 0.0f, sim.state.speed_mph);
+    TEST_ASSERT_FLOAT_WITHIN(60.0f, SIM_IDLE_RPM, sim.state.rpm);
 }
 
 // ── Runner ───────────────────────────────────────────────────────────────────
@@ -784,6 +856,7 @@ int main(int, char**) {
     RUN_TEST(test_sim_accelerates_from_standstill);
     RUN_TEST(test_sim_gears_follow_speed);
     RUN_TEST(test_sim_values_stay_in_bounds);
+    RUN_TEST(test_sim_coasting_keeps_engine_coupled_to_road_speed);
     RUN_TEST(test_sim_odometer_advances);
     RUN_TEST(test_sim_dt_clamp);
 
@@ -797,6 +870,7 @@ int main(int, char**) {
     RUN_TEST(test_driver_corner_speed_mapping);
 
     RUN_TEST(test_race_boot_then_live);
+    RUN_TEST(test_external_startup_does_not_advance_demo_trip);
     RUN_TEST(test_race_full_lap_finish_and_restart);
     RUN_TEST(test_race_alert_near_danger_waypoint);
     RUN_TEST(test_race_gear_snap_progress);
@@ -837,6 +911,8 @@ int main(int, char**) {
     RUN_TEST(test_fmt_race_time);
     RUN_TEST(test_ui_theme_sanitization);
     RUN_TEST(test_ui_numeric_clamps);
+    RUN_TEST(test_rtl_profiles_priority_and_timeout);
+    RUN_TEST(test_rtl_count_clamp_and_wrap_keepalive);
 
     return UNITY_END();
 }

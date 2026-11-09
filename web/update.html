@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b0b0b">
+<meta name="color-scheme" content="dark light">
+<title>stormDASH · Aggiornamento</title>
+<style>/* INLINE_STYLE */</style>
+</head>
+<body class="update-page">
+<a href="#updateMain" class="skip-link">Vai all’aggiornamento</a>
+<header class="app-header">
+  <a class="brand" href="/#pit" aria-label="stormDASH, torna al cockpit"><svg class="brand-mark" viewBox="0 0 28 28" aria-hidden="true"><circle cx="4" cy="4" r="2"/><circle cx="14" cy="4" r="2"/><circle cx="24" cy="4" r="2"/><circle cx="4" cy="14" r="2"/><circle cx="14" cy="14" r="2"/><circle cx="24" cy="14" r="2"/><circle cx="4" cy="24" r="2"/><circle cx="14" cy="24" r="2"/><circle cx="24" cy="24" r="2"/></svg><span>stormDASH</span><small>SYSTEM UPDATE</small></a>
+  <div class="header-right"><button id="themeToggle" class="icon-button" type="button" aria-label="Attiva tema chiaro" aria-pressed="false"><svg class="icon theme-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 13A9 9 0 0 1 11 3.5 9 9 0 1 0 20.5 13Z"/></svg><svg class="icon theme-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></svg></button><a class="update-back" href="/#pit"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m14 6-6 6 6 6"/></svg><span>Pit & setup</span></a></div>
+</header>
+<main id="updateMain">
+  <div class="update-intro"><span class="eyebrow">SYSTEM / FIRMWARE</span><h1>Il prossimo<br><span class="gradient-text">aggiornamento.</span></h1><p>Il nuovo firmware, direttamente a bordo.<br>Un file. Una connessione locale.</p><span class="update-chip">ESP32-S3 / N16R8</span></div>
+  <div class="update-layout">
+    <div class="update-guide"><span class="eyebrow">PRIMA DI INSTALLARE</span><ol class="update-steps">
+      <li><span class="step-number" aria-hidden="true">01</span><div><h2>Prepara il cruscotto</h2><p>Chiudi la sessione Trail e torna alla modalità Strumenti. Mantieni la scheda alimentata e il telefono collegato alla rete stormDASH.</p></div></li>
+      <li><span class="step-number" aria-hidden="true">02</span><div><h2>Scegli il firmware</h2><p>Estrai <strong>firmware.bin</strong> dal pacchetto stormDASH N16R8 verificato. Seleziona quel file nel riquadro e avvia l’installazione.</p></div></li>
+      <li><span class="step-number" aria-hidden="true">03</span><div><h2>Attendi il riavvio</h2><p>Lascia aperta questa pagina durante l’invio. Al termine, la scheda si riavvia: riconnettiti alla rete stormDASH e riapri il portale.</p></div></li>
+    </ol></div>
+    <section class="update-upload" aria-labelledby="file-heading">
+      <div class="update-file-mark" aria-hidden="true"><svg viewBox="0 0 64 72" fill="none"><path d="M39 2H9a7 7 0 0 0-7 7v54a7 7 0 0 0 7 7h46a7 7 0 0 0 7-7V25L39 2Z" stroke="currentColor" stroke-width="1.5"/><path d="M39 2v23h23" stroke="currentColor" stroke-width="1.5"/><path d="M32 56V34m-9 9 9-9 9 9" stroke="var(--accent)" stroke-width="2"/></svg><span>.BIN</span></div>
+      <span class="eyebrow">PACCHETTO FIRMWARE</span><h2 id="file-heading">Pronto da installare.</h2><p>Seleziona <strong>firmware.bin</strong>.<br>Formato .bin · ESP32-S3 N16R8</p>
+      <form method="post" enctype="multipart/form-data" action="/api/storm/update?token={{TOKEN}}"><fieldset><label for="firmware">File del firmware</label><input id="firmware" required type="file" name="firmware" accept=".bin"><button class="primary" type="submit">Installa firmware <span aria-hidden="true">↗</span></button></fieldset></form>
+      <p class="update-note">L’installazione richiede la modalità Strumenti.</p>
+    </section>
+  </div>
+  <details class="update-data"><summary>Come vengono protetti i tuoi dati<svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary><p>L’aggiornamento scrive lo slot inattivo e conserva foto e impostazioni. Usa esclusivamente un file proveniente da una fonte fidata: la verifica del formato non autentica l’autore del file. Nessuna firma crittografica è configurata.</p></details>
+  <footer><div><strong>stormDASH</strong>COCKPIT CONTROL</div><div class="footer-right">Collegamento locale.<br>Nessun servizio cloud richiesto.</div></footer>
+</main>
+<script>/* PRESENTATION_SCRIPT */</script>
+<script>/* UPDATE_SCRIPT */</script>
+</body>
+</html>

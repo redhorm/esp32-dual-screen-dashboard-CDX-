@@ -41,6 +41,9 @@ struct UiFx {
 class RaceController {
 public:
     void reset(uint32_t now_ms);
+    // The display startup has its own timeline. Enter LIVE at its completion
+    // without counting that time as distance, run time or a simulation step.
+    void finishBoot(uint32_t now_ms);
     void update(uint32_t now_ms, Simulator& sim, Roadbook& rb);
 
     const UiFx&     fx()    const { return _fx; }

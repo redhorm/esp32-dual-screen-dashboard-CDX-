@@ -1,0 +1,392 @@
+RECOIL PULSE — GUIDA DEL PRODOTTO
+Firmware 6.0.0-rc.2 · ESP32-S3 · due display incassati
+
+RECOIL PULSE mette al centro il cruscotto Recoil e una sola esperienza visiva:
+due strumenti coordinati e sedici punti luminosi prodotti dal display pilota,
+visibili attraverso i fori della maschera. Non richiede LED o pulsanti nuovi.
+
+Questa revisione riguarda il firmware. Le sedi dei display, le cornici e i
+fissaggi del modello non vengono modificati. Per le parti fini della maschera
+pilota resta indicato l'ugello da 0,25 mm, layer 0,10 mm, come nel progetto
+meccanico corrispondente. La prova di allineamento con le parti stampate è
+necessaria: una simulazione grafica non misura l'accoppiamento reale.
+
+ASPETTO DEGLI STRUMENTI
+
+Il pilota riprende la gerarchia Racepak IQ3: fondo LCD blu, numeri a segmenti,
+marcia al centro, velocità e tempo ai lati, barra del contagiri arcuata e
+campi RPM/VOLT inferiori. I punti di cambiata lavorano a coppie simmetriche,
+mantenendo i sedici centri della maschera già costruita.
+
+Il copilota riprende il Lowrance HDS-7 LIVE: carta color crema con curve di
+livello sintetiche, rotta magenta, traccia percorsa azzurra e freccia del
+veicolo. La vista tiene il nord in alto e segue la posizione simulata. I dati
+SOG, COG e DTW indicano velocità, direzione e distanza al prossimo waypoint
+del percorso dimostrativo; unità e scala restano coerenti tra loro.
+
+Le sigle aiutano a riconoscere l'aspetto degli strumenti reali. DEMO resta
+visibile: nessuna posizione o grandezza del veicolo è misurata da questi
+disegni. Il terreno è generato dal firmware, senza cartografia geografica.
+Il confronto con manuale e video ufficiali, con pagine e tempi esaminati,
+è documentato in RIFERIMENTI_GRAFICA.txt.
+
+
+1. ANALISI DEL FIRMWARE DI PARTENZA
+
+Le parti utili erano già presenti: driver dedicati ai due pannelli, coordinate
+ricavate dalla maschera, portale Wi-Fi offline, impostazioni persistenti con
+CRC e copia di riserva, luminosità separata, diagnostica, ingresso PWM in sola
+lettura e controllo RTL con timeout. Queste basi vengono conservate.
+
+Il progetto aveva però più identità concorrenti, cinque schede web, tre temi
+generici oltre a Recoil, Pong con un secondo server WebSocket e una galleria
+fotografica. Il trasferimento della proprietà dei display durante il gioco
+complicava il rendering. Font e immagini aggiungevano lavoro e dipendenze
+alla visualizzazione principale. Alcuni testi dei temi precedenti sembravano
+annunciare GPS o salvataggi reali che il codice non effettuava.
+
+Un limite importante resta esplicito: velocità, giri, marcia, batteria,
+temperature, livello carburante e percorso del cruscotto provengono dal
+simulatore. Non sono letture del modello. Il firmware non legge un ricevitore
+GPS, un sensore giri o un voltmetro. La scritta DEMO identifica questi dati
+anche nell'uso normale. L'eventuale ingresso PWM ESC è reale e viene mostrato
+separatamente; non fornisce una misura di velocità o giri motore.
+
+
+2. COSA RESTA E COSA È STATO SEMPLIFICATO
+
+Restano:
+- cruscotto Recoil e modalità di allineamento della maschera;
+- display pilota 160×80 e copilota 240×135, pin e offset esistenti;
+- luminosità, unità, lingua IT/EN, identità del veicolo;
+- Wi-Fi locale con password propria della scheda e diagnostica;
+- logo di avvio opzionale, quando LittleFS è disponibile;
+- luci RTL e ingresso ESC opzionali, con le protezioni temporali esistenti;
+- una nuova modalità SHOW da 18 secondi.
+
+Tolti dal percorso normale:
+- Pong e il relativo WebSocket: non servivano allo strumento e introducevano
+  un'altra modalità, altri comandi e il cambio di proprietario dei display;
+- selezione Classic / Race Realism / Stock: il prodotto usa un'identità sola;
+- galleria e slideshow: aumentavano menu, conversioni e letture dei file;
+- scelta di molte transizioni fotografiche e schermate ridondanti;
+- font VLW dei vecchi temi nel rendering Recoil.
+
+I dati delle foto esistenti non vengono cancellati come parte della
+semplificazione. Il codice di conservazione/recupero dei media e i campi
+legacy delle impostazioni restano per compatibilità. Questo non significa
+che la galleria sia ancora una funzione accessibile dal prodotto.
+
+Il logo viene preparato per entrambi gli schermi; sul pilota viene limitato
+alla finestra fisica della maschera, con i sedici punti spenti. Il disegno
+iniziale viene decodificato una sola volta, senza letture fotografiche nel
+ciclo dello SHOW.
+
+
+ACCENSIONE DEGLI STRUMENTI — NOVITÀ RC.2
+
+A ogni avvio, l’eventuale immagine personale precede una sequenza coordinata
+di 5,6 secondi. Senza immagine o senza LittleFS, l’animazione parte comunque.
+Non legge file e non richiede nuovi componenti. DEMO resta visibile.
+
+Pilota:
+- 0–1 s: tutti i segmenti del quadro e i sedici punti CAD accesi;
+- 1–4 s: identità IQ3 e indicazione della versione del progetto;
+- 4–5,6 s: strumenti demo a riposo, 0 km/h e 800 RPM.
+
+Copilota:
+- 0–3 s: introduzione LOWRANCE / HDS LIVE, indicata come adattamento Recoil;
+- 3–4,6 s: comparsa della carta dimostrativa;
+- 4,6–5,6 s: carta ferma; poi riprende l’uso normale.
+
+La durata parte dalla sequenza animata, dopo l’inizializzazione del sistema
+e l’eventuale immagine. Non è una promessa sul tempo totale tra alimentazione
+e cruscotto: mount dell’archivio e avvio della rete possono richiedere tempo.
+
+Il test segmenti di 1 s e il banner di 3 s sono documentati per la variante
+IQ3 Drag/Data Logger; per il modello IQ3 Display è confermato il banner, non
+lo stesso tempo. L’avvio HDS è una ricostruzione grafica: le fonti non danno
+questi tempi o una percentuale di caricamento. Non mostriamo un’acquisizione
+GPS, sensori verificati o un autotest hardware che il firmware non esegue.
+Il confronto completo è in RIFERIMENTI_GRAFICA.txt.
+
+Durante l’animazione:
+- BOOT breve la interrompe e avvia lo SHOW;
+- BOOT per 2 s la interrompe e mostra rete/password;
+- AVVIA SHOW dal portale passa direttamente allo SHOW;
+- CALIBRA MASCHERA passa alla verifica delle aperture.
+La sequenza di avvio non riparte tornando dallo SHOW o dalla schermata Wi-Fi.
+Lo SHOW resta una dimostrazione volontaria separata di 18 secondi.
+
+
+3. TRE IDEE REALIZZABILI E SCELTA
+
+Le valutazioni seguenti sono progettuali, non misure di FPS sulla scheda.
+Impatto e utilità sono espressi da 1 a 5.
+
+PULSE LINK — SCELTA E IMPLEMENTATA
+Impatto 5/5; utilità 4/5 come presentazione degli strumenti e della loro
+sincronizzazione. Il quadro IQ3 e la carta HDS seguono lo stesso veicolo
+dimostrativo: velocità, marcia, giri, luci e spostamento concordano. La svolta
+del cursore corrisponde al superamento di un waypoint; la maschera resta
+rispettata anche quando si accendono le coppie centrali dei sedici punti.
+Costo: basso. Nessun framebuffer aggiuntivo, nessuna bitmap animata, nessuna
+allocazione nel renderer SHOW. Stato temporale 8 byte e frame condiviso
+20 byte nella build host verificata. Usa i due sprite già necessari.
+La capacità reale mostrata è il coordinamento dei due LCD e delle aperture
+ottiche. Percorso, velocità e checkpoint sono chiaramente dimostrativi.
+
+PIT CHECK — NON SCELTA COME SHOW
+Impatto 3/5; utilità 5/5. Sequenza guidata di punti, bordi e segnali per
+controllare montaggio e cablaggio. Costo molto basso, riutilizzando geometria
+e disegni elementari. La calibrazione disponibile copre già la verifica
+visiva dei sedici punti; una procedura guidata completa sarebbe un'estensione.
+
+AFTER RUN — NON IMPLEMENTATA
+Impatto 4/5; utilità 2/5 con l'hardware attuale. Una scheda animata riassume
+una corsa. Costo di memoria contenuto, ma richiederebbe nuova logica per le
+statistiche e non avrebbe dati di viaggio realmente misurati da mostrare.
+Per questo aggiungerebbe soprattutto una seconda dimostrazione.
+
+
+4. COMANDI QUOTIDIANI
+
+Durante il funzionamento:
+- BOOT, pressione breve e rilascio: avvia SHOW; durante SHOW lo interrompe.
+- BOOT, tenuto premuto per 2 secondi: mostra rete e password per 15 secondi.
+  La pressione lunga non deve avviare anche SHOW al rilascio.
+- Non tenere BOOT premuto all'accensione per questi comandi: quella è la
+  procedura del bootloader USB della scheda.
+
+Collegamento dal telefono:
+1. Leggi la rete ULTRA4-DASH-XXXXXXXX e la password sui display.
+2. Collegati e resta sulla rete anche quando il telefono segnala che non
+   offre Internet. La password è unica per la scheda ed è memorizzata.
+3. Apri http://192.168.4.1 se il portale non si apre da solo.
+
+Il nome della rete resta quello precedente per non cambiare i collegamenti
+già memorizzati. Il prodotto e il portale si chiamano RECOIL PULSE.
+
+Il portale ha tre aree:
+- GUIDA: AVVIA SHOW · 18 s / INTERROMPI SHOW, dati demo, stato PWM reale e
+  identità del veicolo opzionale.
+- LUCI: comandi RTL, luminosità e configurazione ESC, se l'hardware è montato.
+- IMPOSTAZIONI: luminosità dei pannelli, unità, lingua, CALIBRA MASCHERA /
+  TORNA ALLA GUIDA, logo di avvio opzionale e diagnostica. Nella sezione
+  hardware è possibile ripristinare il profilo copilota 240×135: è l'unico
+  profilo operativo del prodotto, senza alternative quadrate nel menu.
+
+Il primo utilizzo non richiede un nome veicolo o numero gara per accedere
+allo SHOW. La pagina funziona localmente: nessun account e nessuna app.
+
+
+5. SHOW: 18 SECONDI, UN SOLO RITMO
+
+0–2 s: appare PULSE; i sedici punti pilota si accendono in circa 1,2 secondi.
+2–8 s: appaiono gli strumenti IQ3/HDS; accelerazione demo da 0 a 88 km/h,
+       cambi marcia, contagiri e movimento della carta concordano.
+8–14,5 s: PULSE LINK. Picco delle luci a 8 secondi, poi velocità tra 72 e
+          88 km/h in cicli da 1,6 s. Intorno a 9,4 s viene raggiunto WP01:
+          il cursore gira, COG passa da 0 a 45 gradi e DTW cambia obiettivo.
+14,5–18 s: firma RECOIL PULSE e chiusura.
+18 s: ritorno automatico alla visualizzazione normale.
+
+DEMO resta leggibile su entrambi gli schermi per tutta la sequenza. Il tempo
+avanza in modo non bloccante. Interrompi con BOOT breve oppure INTERROMPI
+SHOW; avvia nuovamente per ripetere dall'inizio. Un comando web di avvio
+duplicato durante la stessa sequenza non la riavvia.
+
+La dimostrazione SHOW usa km/h. In modalità normale valgono le unità scelte
+nelle impostazioni. La distanza demo è l'integrale della velocità mostrata:
+la mappa non scorre indipendentemente dai dati del quadro.
+
+SHOW non genera input ESC fittizi e non usa il valore simulato della velocità
+per comandare la barra RTL. Quest'ultima conserva il proprio controllo.
+
+Per un'integrazione locale:
+  GET  /api/show
+  POST /api/show    form action=start oppure action=stop
+Lo stato comprende active, elapsedMs, durationMs, pending e requestedActive.
+pending indica che il comando deve ancora essere acquisito dal rendering.
+
+
+6. COLLEGAMENTI ESISTENTI
+
+I numeri sono GPIO, non la posizione fisica del piedino sul connettore.
+Spegnere prima di modificare i collegamenti. GND comune per tutti i moduli.
+
+Segnale sul display       Pilota 0,96" ST7735S       Copilota 1,14" ST7789V
+GND                      GND                        GND
+VCC                      3V3                        3V3
+SCL / CLK                GPIO12                     GPIO14
+SDA / DIN / MOSI          GPIO11                     GPIO13
+RES / RST                GPIO8                      GPIO17
+DC                       GPIO9                      GPIO16
+CS                       GPIO10                     GPIO15
+BLK / BL                 GPIO46                     GPIO18
+
+RES va al GPIO indicato, non a RESET/EN della DevKit. BLK non va collegato
+contemporaneamente al GPIO e direttamente a 3V3. La rimozione dei pin
+saldati dei display non cambia la corrispondenza: saldare ai medesimi pad.
+
+Display pilota: pannello nativo 80×160, usato landscape 160×80.
+Display copilota: pannello nativo 135×240, usato landscape 240×135.
+Rotazione 1 per entrambi; offset pilota 26/1, copilota 52/40.
+La configurazione è quella esistente; non è necessario ricablare per SHOW.
+
+Opzionali:
+- GPIO4: DATA di una barra da 16 WS2812. Alimentazione 5 V regolata separata,
+  massa comune e adattamento logico 3,3→5 V come nel cablaggio esistente.
+  Il GPIO porta il segnale, non alimenta i LED.
+- GPIO5: ingresso PWM ESC in sola lettura, condizionato a 3,3 V. Non è
+  un'uscita verso ESC, motore o servo. Senza segnale valido resta NO SIGNAL.
+
+Per dashboard e SHOW bastano ESP32-S3 e i due TFT già presenti. I sedici
+punti del pilota provengono dai pixel del TFT, non dalla barra WS2812.
+
+
+7. COMPILARE E CARICARE
+
+BINARI PRONTI, SENZA RICOMPILARE
+Estrarre tutto il pacchetto mantenendo queste due cartelle affiancate:
+  RECOIL_PULSE_6.0.0-rc.2/Progetto_Recoil_Pulse
+  RECOIL_PULSE_6.0.0-rc.2/BINARI
+Aprire il terminale dentro Progetto_Recoil_Pulse. Il caricatore cerca
+../BINARI/flash_manifest.json e verifica i quattro file prima di usarli.
+
+Per controllare file, SHA-256 e partizioni senza accesso USB né esptool:
+  python3 tools/flash_precompiled.py --dry-run --port PORTA_TEST
+
+Per caricare su macOS / Linux:
+  python3 -m venv .flash-venv
+  .flash-venv/bin/python -m pip install esptool==4.11.0
+  .flash-venv/bin/python tools/flash_precompiled.py --port /dev/cu.usbmodem101
+
+Per caricare su Windows:
+  py -m venv .flash-venv
+  .flash-venv\Scripts\python.exe -m pip install esptool==4.11.0
+  .flash-venv\Scripts\python.exe tools\flash_precompiled.py --port COM5
+
+Sostituire /dev/cu.usbmodem101 o COM5 con la porta effettiva della scheda.
+La creazione dell'ambiente e l'installazione esptool servono una volta sola.
+Il comando scrive bootloader.bin a 0x0, partitions.bin a 0x8000,
+boot_app0.bin a 0xe000 e firmware.bin a 0x10000. Verifica dimensioni e
+checksum contro il manifest e controlla la tabella partizioni; se il
+pacchetto non corrisponde, si ferma. NVS e LittleFS non sono incluse nella
+scrittura. Non usare un file merged a indirizzo zero per sostituire questa
+procedura: il pacchetto consegna quattro binari distinti.
+
+COMPILAZIONE DAL SORGENTE, PER MODIFICARE IL PROGETTO
+Aprire un terminale nella cartella del progetto che contiene platformio.ini.
+Serve Python 3.9 o successivo; il primo download degli strumenti richiede
+Internet. La build usa Arduino su ESP32-S3, PlatformIO espressif32 7.0.1,
+LovyanGFX 1.2.25 e Adafruit NeoPixel 1.15.1, con versioni fissate nel progetto.
+
+macOS / Linux:
+  python3 tools/flash_dashboard.py --install-platformio
+  python3 tools/flash_dashboard.py --build
+  python3 tools/flash_dashboard.py --flash
+
+Windows:
+  py tools\flash_dashboard.py --install-platformio
+  py tools\flash_dashboard.py --build
+  py tools\flash_dashboard.py --flash
+
+L'installazione di PlatformIO va eseguita solo quando serve. Il tool trova
+anche installazioni già disponibili e può proporre la porta corretta.
+Per indicare una porta esplicitamente, usare il nome rilevato sul proprio PC:
+  python3 tools/flash_dashboard.py --flash --port /dev/cu.usbmodem101
+  py tools\flash_dashboard.py --flash --port COM5
+
+In alternativa, con PlatformIO già nel PATH:
+  pio run -e esp32-s3-devkitc-1
+  pio run -e esp32-s3-devkitc-1 -t upload --upload-port PORTA
+
+Usare un cavo USB dati. Se la scheda non entra nel bootloader, applicare la
+procedura BOOT/RESET prevista dalla DevKit. Nel cablaggio esistente BLK del
+pilota è su GPIO46: se impedisce il caricamento, scollegare quel collegamento
+a scheda spenta, programmare, poi ricollegarlo a scheda spenta. Il pin non
+viene rimappato da questo firmware.
+
+La compilazione produce .pio/build/esp32-s3-devkitc-1/firmware.bin. Non
+scrivere questo singolo file a indirizzo zero: usare il tool o PlatformIO,
+che caricano anche bootloader e tabella delle partizioni agli offset corretti.
+
+La tabella è da 8 MB e non richiede PSRAM. Può essere usata sulla variante
+con flash maggiore mantenendo questa disposizione, senza utilizzare per
+forza tutta la memoria fisica. Esiste un solo slot applicazione: OTA e
+rollback automatico del firmware non fanno parte di questa consegna.
+
+Il normale --flash non esegue erase-all né uploadfs. Con la stessa tabella
+partizioni conserva impostazioni e file. Questo non promette una migrazione
+automatica da firmware estranei che usino partizioni in posizioni diverse.
+Scegliere il caricamento precompilato oppure quello da sorgente: non è
+necessario eseguirli entrambi.
+
+ARCHIVIO MEDIA — PRIMO AVVIO E RESET INTENZIONALE
+Strumenti, accensione animata, portale e SHOW funzionano senza LittleFS.
+La rc.2 inizializza automaticamente una partizione verificata vuota:
+Al primo avvio prova prima il mount dell'archivio, incluso il nome legacy.
+Se non riesce, legge tutta la partizione scelta: solo byte 0xFF consentono
+la prima inizializzazione automatica. Non basta che siano vuoti i primi
+blocchi. Se esistono dati, una lettura fallisce o la partizione non è idonea,
+la conserva senza formattarla e segnala l'errore. Questo non ripara un
+archivio corrotto cancellandolo di nascosto.
+
+In IMPOSTAZIONI → Hardware e diagnostica controllare lo stato dell'archivio.
+L'API /api/photos riporta fsReady, storageState e formattedOnBegin.
+Quest'ultimo indica l'inizializzazione di memoria verificata vuota.
+Strumenti, portale, accensione animata e SHOW restano disponibili anche se
+l'archivio richiede un intervento separato. Non cancellare i media solo per
+nascondere un errore o per far partire lo SHOW.
+
+Solo per un reset intenzionale dell’archivio:
+  python3 tools/flash_dashboard.py --flash --factory-init-media
+Questa operazione CANCELLA i media esistenti, incluso il vecchio logo e le
+foto. Il tool chiede conferma. Non è il normale aggiornamento del firmware
+e non serve per una partizione verificata vuota.
+
+La voce «Avvii registrati» è un contatore storico conservato sulla scheda.
+Il numero da solo non indica una sequenza di riavvii anomali; per verificarla
+confrontare il valore prima e dopo l’uso e leggere il motivo dell’ultimo reset.
+
+
+8. ALLINEARE LA MASCHERA
+
+Aprire IMPOSTAZIONI → CALIBRA MASCHERA con i display montati e avvitati nella
+posizione finale. Verificare tutti i sedici punti e l'intera finestra utile.
+La geometria resta derivata da references/recoil/Coordinate_luci_160x80.json;
+non spostare le luci per compensare a vista una cornice o un display montato
+fuori posizione. Prima controllare sede, orientamento e profilo display.
+TORNA ALLA GUIDA ripristina la grafica normale.
+
+Centri dei 16 punti (pixel, origine in alto a sinistra del display pilota):
+X: 10 19 28 37 46 55 64 73 86 95 104 113 122 131 140 149
+Y: 23 19 15 13 10  9  7  7  7  7   9  10  13  15  19  23
+
+In SHOW il testo del pilota viene limitato alla finestra della maschera e i
+punti vengono disegnati per ultimi. Restano gli stessi centri e colori.
+Il collaudo fisico di luce, bordi, rotazione e contrasto è descritto in
+COLLAUDO_RECOIL_PULSE.txt.
+
+
+9. REEL VERTICALE DA 20 SECONDI
+
+Prima di registrare: montare le cornici, scegliere una luminosità leggibile
+senza bruciare i bianchi e inquadrare entrambi gli strumenti in verticale.
+Non riprendere la schermata della password.
+
+0–2 s: primo piano dei due display; pressione breve di BOOT. PULSE e la
+        rapida accensione dei sedici punti danno subito il segno del prodotto.
+2–8 s: piccolo avvicinamento al percorso copilota e al quadro pilota.
+        Lasciare visibile DEMO; la mappa è una dimostrazione.
+8–14,5 s: momento wow. Tenere entrambi i display nell'inquadratura: le luci
+           centrali raggiungono il picco a 8 s, poi intorno a 9,4 s il cursore
+           svolta davvero al waypoint. Far leggere insieme giri e carta.
+14,5–18 s: fermare la camera sulla firma RECOIL PULSE.
+18–20 s: mostrare il ritorno automatico al cruscotto, oppure una nuova
+          pressione breve per far capire che la sequenza è ripetibile.
+
+Testo breve suggerito sul Reel: “2 schermi. 16 punti. Un solo ritmo.”
+La compilazione e i test software non sostituiscono una prova filmata sul
+dispositivo. Vedere il documento di collaudo per lo stato delle verifiche.

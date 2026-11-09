@@ -1,0 +1,34 @@
+PASS Embedded source and deliverable previews are identical; no CDN
+PASS Initial connection loads saved rules and never invents a card
+PASS Session controls follow state, undo and event capacity
+PASS Integer input bounds reject invalid seeds and weights before sending
+PASS Card uses immutable closed result, original weight and real origin
+PASS Test-only archive is never exported as a real outing
+PASS Malformed archive cannot become an exported result
+PASS Network loss freezes controls and discloses stale displayed values
+PASS Concurrent poll requests share a single HTTP request
+PASS Controller heartbeat is foreground-only; tab/page leaving pauses game
+PASS Jump sends immediately without waiting for a state read
+PASS HTTP rejection is distinct from disconnection
+PASS Request timeout releases pending commands without automatic replay
+PASS WOW validates five mode IDs and bounded spectral payloads
+PASS All five WOW selectors send the intended mode; Midnight seed is bounded
+PASS Steering holds refresh at the bounded cadence and cancel releases neutral
+PASS Steering keyboard, focus loss and paused state cannot stick
+PASS WOW heartbeat follows visibility and explicit Midnight resume
+PASS Touch pads clamp pointer bounds and provide keyboard controls
+PASS One in-flight control coalesces movement to the latest gesture
+PASS Control timeout discards pending movement and never replays it
+PASS Audio files stay local and reject empty, oversized and unrelated files
+PASS Local audio starts only on gesture and packs four bands without sign loss
+PASS Audio stop, page hiding and mode exit release every audio resource
+PASS Audio cannot restart after hiding during a pending play promise
+PASS Unsupported audio and suspended context report errors without streaming
+PASS BOOT pause and arrival clear a held pointer before explicit resume
+PASS Late steering completion neutralizes a released control without cancelling a new press
+PASS Late spectral completion repeats stop without stopping a newer playback
+PASS Home is the default; shortcuts navigate without sending device commands
+PASS Home mirrors confirmed session and display state, then clearly goes offline
+PASS Returning to a selected WOW controller enables it immediately without a new poll
+
+32/32 portal behavior checks passed. Fixture tests only; no physical latency/FPS claims.

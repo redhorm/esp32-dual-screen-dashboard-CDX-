@@ -1,0 +1,34 @@
+RECOIL PULSE — GEOMETRIA TFT E MASCHERA
+Firmware 6.0.0-rc.2
+
+Il firmware mantiene le coordinate delle sedici aperture pilota e la finestra
+utile del modello Recoil. Non modifica sedi, cornici, viti o file di stampa.
+
+Riferimenti nel progetto:
+- references/recoil/Coordinate_luci_160x80.json: contratto delle coordinate;
+- src/app/recoil_geometry.h: geometria generata per il renderer;
+- tools/generate_recoil_geometry.py: generazione/verifica del contratto;
+- src/app/recoil_renderer.h: strumenti e calibrazione;
+- src/app/show_renderer.h: SHOW, con ritaglio della finestra e punti disegnati
+  per ultimi.
+
+Verifica senza modificare il file generato:
+  python3 tools/generate_recoil_geometry.py --check
+
+Pilota: 160×80 landscape, ST7735S 0,96 pollici.
+Copilota: 240×135 landscape, ST7789V 1,14 pollici.
+Questo prodotto usa solo il profilo copilota 240×135.
+
+Centri (pixel, origine in alto a sinistra):
+X: 10 19 28 37 46 55 64 73 86 95 104 113 122 131 140 149
+Y: 23 19 15 13 10  9  7  7  7  7   9  10  13  15  19  23
+
+Nel portale: IMPOSTAZIONI → CALIBRA MASCHERA; poi TORNA ALLA GUIDA.
+La prova va eseguita con la maschera montata e il display nella sede finale.
+Per i dettagli fini resta indicato ugello 0,25 mm / layer 0,10 mm del progetto
+meccanico corrispondente. Il firmware non certifica la tolleranza di stampa.
+
+Guida attuale: PRODOTTO_RECOIL_PULSE.txt.
+Prove e limiti: COLLAUDO_RECOIL_PULSE.txt.
+Le vecchie istruzioni con temi multipli, galleria e montaggi superati non
+sono la guida di questa versione.

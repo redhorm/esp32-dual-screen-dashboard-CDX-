@@ -1,0 +1,22 @@
+stormDASH 7.1.0-rc.4-crawler
+Display pilota 0,96″ 160×80 e copilota 1,14″ 240×135
+
+CORREZIONE PER IL TUO CRAWLER
+Il verso del gas è invertito rispetto all’interpretazione precedente: accelerando compariva RETRO. Questo aggiornamento seleziona una volta il profilo Crawler avanti / retro immediata e attiva Inverti verso gas. Mantiene il neutro già calibrato a 1524 µs e la zona neutra di 45 µs; le scelte successive rimangono salvate.
+La retro crawler non passa più dalla fase freno o da un’attesa di conferma. Restano il filtro antidisturbo e la zona neutra. Le luci posteriori e gli strumenti usano lo stesso verso corretto.
+
+CONTROLLO DAL TELEFONO
+Tieni premuto BOOT per 2 secondi, collegati alla rete stormDASH indicata sul display e apri http://192.168.4.1.
+In LUCI > Configurazione avanzata PWM / ESC trovi:
+- Tipo ESC: Crawler avanti / retro immediata.
+- Inverti verso gas: attivo per il problema che hai segnalato. Se cambi radio o inverti il canale gas, verifica il verso e cambia questa opzione se necessario.
+- Neutro e zona neutra: conserva le misure calibrate salvo cambiamenti del segnale della radio.
+Premi SALVA LUCI E MODALITÀ. La conferma retro è nascosta e ignorata in modalità crawler.
+La lettura mostra AVANTI, NEUTRO o RETRO, il PWM filtrato, quello grezzo e l’età del campione. Senza PWM valido gli strumenti indicano attesa e tornano a zero.
+
+PROVA SUL RICEVITORE
+Con il modello fermo e le ruote libere, verifica: grilletto rilasciato = NEUTRO; accelerazione avanti = AVANTI; comando contrario = RETRO, senza seconda pressione. Se il neutro oscilla, confronta il valore PWM fermo con il neutro salvato prima di modificarlo.
+
+COLLEGAMENTO E LIMITI
+Segnale gas del ricevitore su GPIO 5, massa GND comune, segnale compatibile 3,3 V. Non collegare l’alimentazione BEC al GPIO.
+Il firmware legge il segnale e non comanda il motore né modifica l’ESC. Velocità e RPM sono valori scenografici proporzionali al gas, non telemetria reale. La prova software non dimostra da sola la corrispondenza fisica tra il grilletto della radio e il senso di marcia del veicolo.

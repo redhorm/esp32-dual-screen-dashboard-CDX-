@@ -1,0 +1,19 @@
+stormDASH — 7.1.0-rc.5-shift
+CAMBIO SIMULATO E TARATURA DEL GAS
+
+Avanti, neutro, retro crawler e inversione restano quelli già configurati. Non modificare “Inverti verso gas” se il radiocomando corrisponde correttamente alle direzioni.
+
+Gli strumenti simulano le marce 1 → 2 → 3 → 4 → 5 durante l’accelerazione. A ogni cambiata i giri scendono e poi risalgono. In quinta, mantenendo tutto gas correttamente tarato, la simulazione raggiunge il limitatore e le luci RPM. La retro mantiene R. Neutro e perdita del segnale riportano gli strumenti a riposo.
+
+CALIBRAZIONE GUIDATA — NON DEVI LEGGERE NÉ INSERIRE NUMERI
+1. Apri il portale Wi-Fi stormDASH e vai a LUCI.
+2. Premi CALIBRA GAS MASSIMO.
+3. Solleva il modello lasciando libere le ruote; tieni tutto gas AVANTI.
+4. Senza rilasciare il gas, premi LEGGI E SALVA.
+5. Attendi “Gas massimo calibrato e salvato”, poi rilascia.
+
+La lettura verifica cinque campioni stabili prima di salvare. Se il gas si muove o il segnale non è valido, la taratura non viene modificata e puoi riprovare. La scelta viene conservata ai riavvii. Calibra tenendo realmente tutto gas: una posizione parziale falserebbe la scala della simulazione.
+
+Dopo la taratura accelera e mantieni tutto gas: verifica il passaggio tra le marce, il calo dei giri e il limitatore in quinta. Non cambiare neutro o inversione per questa taratura.
+
+Questa funzione regola soltanto gli strumenti. Le marce, la velocità e gli RPM sono scenografici; GPIO5 legge il ricevitore e il firmware non aziona un cambio né riprogramma l’ESC.

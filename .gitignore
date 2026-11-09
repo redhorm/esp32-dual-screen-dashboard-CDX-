@@ -1,3 +1,14 @@
 .pio/
+node_modules/
 .DS_Store
 .vscode/
+.tools/
+tmp/
+__pycache__/
+*.py[cod]
+private-recovery/
+.env
+.env.*
+*.bin
+*.zip
+output/test-evidence/

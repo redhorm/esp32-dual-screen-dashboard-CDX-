@@ -1,0 +1,140 @@
+RECOIL PULSE — RIFERIMENTI DELLA GRAFICA
+Consultazione: 13 ottobre 2026
+
+La grafica ricostruisce l'aspetto di due strumenti reali, adattandolo ai TFT
+160×80 e 240×135 già installati. Il riferimento del pilota è Racepak IQ3
+Display Dash; quello del copilota è Lowrance HDS-7 LIVE, nel contesto off-road
+della versione BAJA. Non è una riproduzione identica pixel per pixel dei loro
+firmware: risoluzione, forma della finestra e funzioni disponibili differiscono.
+
+
+1. COSA È STATO ESAMINATO
+
+Sono stati confrontati le fotografie del manuale ufficiale IQ3, le pagine
+dei produttori e i fotogrammi nei player dei video ufficiali indicati sotto.
+I tempi identificano i punti effettivamente esaminati; non indicano che tutti
+i video siano stati visionati integralmente. Le osservazioni video sono
+distinte dalle informazioni del manuale e dalle scelte del nostro renderer.
+
+
+2. PILOTA — RACEPAK IQ3
+
+Prodotto di riferimento esatto: IQ3 Display Dash, codice 250-DS-IQ3.
+https://www.holley.com/products/data_acquisition/digital_dashes/digital_dashes/parts/250-DS-IQ3/
+
+Manuale ufficiale IQ3 Display Dash, versione 5:
+https://documents.holley.com/techlibrary_iq3_dsp_manual_v5.pdf
+
+Pagine del PDF, contando la copertina come pagina 1:
+- pagina 14: fotografia della disposizione predefinita, con grande campo
+  centrale, velocità a sinistra e campi numerici secondari;
+- pagina 23: schema dei campi programmabili, indicazione di marcia centrale
+  e barra TACH superiore composta da 80 segmenti;
+- pagina 27: configurazione delle luci di cambiata, cinque coppie per dieci
+  LED, con soglie di accensione programmabili.
+
+Il fondo LCD blu, i numeri a segmenti e le etichette piccole e ferme guidano
+la scelta grafica. La gerarchia mette marcia e regime davanti alle decorazioni.
+
+Video ufficiale Holley: “RacePak IQ3 Street Logger Dash”.
+https://www.youtube.com/watch?v=-ND-S08NtPw&t=41s
+Pagina ufficiale che presenta il video:
+https://www.holley.com/blog/post/racepak_iq3_street_logger_dash/
+
+Punti esaminati nel player: 0:41 e 0:48. Si osservano LCD blu, cifre a
+segmenti, barra del contagiri nella zona superiore e luci speculari vicine
+al centro. Il video riguarda IQ3 Street Logger, una variante della famiglia;
+per il riferimento esatto Display Dash prevale il manuale 250-DS-IQ3.
+
+Traduzione nel nostro cruscotto: caratteri disegnati a segmenti, fondo blu
+e informazioni compatte dentro la finestra della maschera. Restano tutti
+i sedici punti ottici del CAD: non si sostituiscono con le dieci luci del
+dispositivo originale. Il TFT illumina direttamente le aperture esistenti;
+le coordinate meccaniche non cambiano. La barra TACH è ridotta per rendere
+i segmenti distinguibili a 160×80.
+
+
+3. COPILOTA — LOWRANCE HDS-7 LIVE / BAJA
+
+Pagina ufficiale HDS-7 LIVE BAJA, codice 000-14942-001:
+https://www.lowrance.com/lowrance/type/fishfinders-chartplotters/hds-7-live-baja/
+
+La descrizione ufficiale presenta BAJA come navigatore off-road, con antenna
+GPS/compasso e cartografia topografica opzionale. Questo stabilisce il contesto
+estetico; questi componenti e queste capacità non sono presenti nel nostro
+ESP32. Il sito può reindirizzare la vecchia pagina alla gamma HDS LIVE.
+
+Video ufficiale Lowrance: “Waypoint Basics”.
+https://www.youtube.com/watch?v=GeslpjEozlg&t=352s
+Tratto esaminato nel player: 5:52–6:07. La carta chiara color crema lascia
+risaltare rotta, simboli di navigazione e dati, senza uno sfondo nero pieno.
+
+Video ufficiale Lowrance: “HDS Live Data Overlays”.
+https://www.youtube.com/watch?v=0kuxUKJcyP8&t=190s
+Punti esaminati nel player: 3:10 e 3:37. Le cifre nere con contorno bianco
+e le piccole etichette restano leggibili sopra la cartografia.
+
+Traduzione nel nostro cruscotto: mappa chiara con terreno sintetico, rotta,
+waypoint e freccia del veicolo; dati sovrapposti con contrasto netto. Il disegno
+privilegia una carta leggibile sul TFT 240×135. Non aggiunge il menu completo,
+il touchscreen o le funzioni di ecoscandaglio del prodotto originale.
+
+
+4. DATI E LIMITI DELLA RICOSTRUZIONE
+
+DEMO rimane visibile: velocità, regime, marcia e percorso sono simulati.
+Il terreno è un disegno sintetico generato dal firmware, non una mappa
+geografica, una cartografia Lowrance o una posizione GPS misurata. Non vengono
+caricati dati cartografici o immagini estratte dai prodotti originali.
+
+Le luci del pilota sono pixel del suo TFT dietro i fori, non LED aggiunti.
+Il PWM ESC opzionale resta un ingresso reale separato per la logica luci;
+non viene convertito in una falsa misura di velocità o regime.
+
+SHOW conserva la durata di 18 secondi e i comandi descritti nella guida.
+Le fonti servono a ricostruire l'aspetto degli strumenti; l'animazione
+PULSE LINK e il coordinamento dei nostri due pannelli sono propri del progetto.
+
+Riferimenti interni:
+- PRODOTTO_RECOIL_PULSE.txt: comandi, collegamenti, installazione e SHOW.
+- RECOIL_TFT.txt: coordinate delle aperture e compatibilità meccanica.
+- COLLAUDO_RECOIL_PULSE.txt: controlli software e prove sul dispositivo.
+
+
+5. ACCENSIONE — FONTI E LIMITI DELLA RC.2
+
+IQ3 Display, modello esatto: il registro ufficiale del firmware non-logger
+riporta, alla versione 8 del 1 ottobre 2008, l'introduzione del banner firmware
+all'accensione. Non specifica la durata del banner né una scansione animata
+del contagiri.
+https://documents.holley.com/techlibrary_iq3_non_logger_display_firmware_revisions.pdf
+Pagina 1 del PDF. Il manuale Display v5, pagina 17, documenta inoltre la
+selezione della pagina predefinita al power-up.
+
+Per la variante IQ3 Drag/Data Logger, il manuale ufficiale descrive tutti i
+segmenti accesi per un secondo e, dopo il ritorno alla visualizzazione normale,
+un banner modello/firmware nella parte inferiore per tre secondi. È evidenza
+sulla famiglia IQ3, non prova di identico comportamento del 250-DS-IQ3.
+https://documents.holley.com/132f490801eb2769114a6493049c484f130131be.pdf
+Pagina 8 del PDF.
+
+HDS LIVE: il manuale Navico descrive l'accensione con POWER e una sequenza di
+dialoghi al primo utilizzo o dopo il reset di fabbrica. Non fissa una durata
+del boot, una barra percentuale di autotest né un tempo di acquisizione GPS.
+Manuale HDS LIVE 988-12063-001, pagina 24 (copia del manuale del produttore):
+https://us.binnacle.com/pdf/Lowrance%20HDS-Live%20Owners%20Manual%20988-12063-001.pdf
+Portale ufficiale dei manuali: https://downloads.lowrance.com/
+
+È stato individuato anche il video ufficiale Lowrance “Setting up a Lowrance
+HDS unit for first use”, 15 maggio 2015:
+https://www.youtube.com/watch?v=Fgrxqg-NpUA
+Il video riguarda una generazione HDS precedente a LIVE. In questa revisione
+è stata verificata la descrizione, non una nuova sequenza di fotogrammi:
+non è usato per attribuire tempi o schermate precise all'HDS-7 LIVE.
+
+L'accensione rc.2 è quindi un adattamento grafico documentato: richiamo al
+test segmenti e banner IQ3, introduzione HDS e comparsa della carta. Durata,
+coordinamento dei due pannelli e illuminazione dei sedici punti CAD sono
+scelte del progetto. Non certificano sensori o hardware e non simulano un
+ricevitore GPS realmente acquisito. DEMO resta riconoscibile. L'accensione
+è distinta da PULSE LINK, lo SHOW volontario da 18 secondi.

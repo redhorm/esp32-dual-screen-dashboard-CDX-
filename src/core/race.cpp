@@ -21,6 +21,15 @@ void RaceController::_enter(Phase p, uint32_t now_ms) {
     _phase_t0 = now_ms;
 }
 
+void RaceController::finishBoot(uint32_t now_ms) {
+    if (_phase != Phase::BOOT) return;
+    _enter(Phase::LIVE, now_ms);
+    _last_ms = now_ms;
+    _fx.phase = Phase::LIVE;
+    _fx.now_ms = now_ms;
+    _fx.phase_ms = 0;
+}
+
 void RaceController::_restartLap(Simulator& sim, Roadbook& rb) {
     sim.state.odo_mi = 0.0f;
     rb.reset();

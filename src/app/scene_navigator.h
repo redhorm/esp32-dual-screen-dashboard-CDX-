@@ -1,61 +1,29 @@
 #pragma once
 #ifndef NATIVE_BUILD
-
 #include <LovyanGFX.hpp>
-#include "core/state.h"
-#include "core/roadbook.h"
 #include "core/race.h"
-#include "core/easing.h"
-#include "ui_fonts.h"
 #include "core/ui_settings.h"
 #include "services/photo_store.h"
-
-// Navigator renderer for Display B — ST7789  240×240
-// WAY MAP style: header / roadbook table + speed column / footer
+#include "hal/copilot_display_profile.h"
 class SceneNavigator {
 public:
-    SceneNavigator(lgfx::LGFX_Device& disp, const Roadbook& rb);
-    void init();
-    void setSettings(const UiSettings& settings) { _settings = settings; }
-    void render(const VehicleState& s, const UiFx& fx, const RunStats& stats);
-    void push();
-
+    SceneNavigator(lgfx::LGFX_Device& d,const Roadbook& r):_spr(&d),_disp(d),_rb(r){}
+    bool init();
+    bool ready()const{return _ready;}
+    bool setDisplayProfile(CopilotDisplayProfile p){if(_ready)return false;_profile=p;return true;}
+    void setSettings(const UiSettings& s){_settings=s;}
+    void setPortalCredentials(bool visible,const char* ssid,const char* password);
+    void render(const VehicleState&,const UiFx&,const RunStats&);
+    void push(){if(_ready)_spr.pushSprite(&_disp,0,0);}
+    LGFX_Sprite& surface(){return _spr;}
 private:
-    LGFX_Sprite        _spr;
+    LGFX_Sprite _spr;
     lgfx::LGFX_Device& _disp;
-    const Roadbook&    _rb;
-    UiFonts            _fonts;
-    UiSettings          _settings;
-    PhotoFrameState     _photoFrame;
-    bool                _bootPhotoLoaded = false;
-
-    // Display-value smoothing / scroll animation (core logic)
-    SlideAnim _scroll;   // roadbook slides between waypoints, never snaps
-    Follow    _distF;    // footer countdown, interpolated at 12 FPS
-    Follow    _spdF;     // side-column speed
-
-    // Phase screens
-    void _renderBoot(const UiFx& fx);
-    void _renderLive(const VehicleState& s, const UiFx& fx);
-    void _renderFinish(const UiFx& fx, const RunStats& stats);
-    void _renderThemedBoot(const UiFx& fx);
-    void _renderThemedLive(const VehicleState& s, const UiFx& fx);
-    void _renderThemedFinish(const UiFx& fx, const RunStats& stats);
-    void _drawThemedRow(int y, const Waypoint& wp, bool active, bool alert_on);
-
-    // Live-frame building blocks
-    void _drawHeader(const UiFx& fx);
-    void _drawTable(const VehicleState& s, const UiFx& fx);
-    void _drawRow(int y, const Waypoint& wp, bool active, bool alert_on);
-    void _drawSideColumn(const VehicleState& s, const UiFx& fx);
-    void _drawFooter(const VehicleState& s, const UiFx& fx);
-    void _drawArrow(int cx, int cy, const Waypoint& wp);
-    void _checkerBand(int y, int h, uint32_t ms);
-
-    // Anti-aliased helpers (LovyanGFX wedge-line primitives)
-    void _aaLine(int x0, int y0, int x1, int y1, uint16_t color);
-    void _aaArc(int cx, int cy, int r, int a0_deg, int a1_deg, uint16_t color);
-    void _aaTri(int x0, int y0, int x1, int y1, int x2, int y2, uint16_t color);
+    const Roadbook& _rb;
+    UiSettings _settings;
+    bool _ready=false,_portalCredentialsVisible=false;
+    char _portalSsid[24]={},_portalPassword[16]={};
+    CopilotDisplayProfile _profile=copilotDisplayDefaultProfile();
+    void _renderRecoil(const VehicleState&,const UiFx&,const RunStats&);
 };
-
-#endif // NATIVE_BUILD
+#endif

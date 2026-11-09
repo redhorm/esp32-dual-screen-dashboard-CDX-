@@ -1,0 +1,63 @@
+/* Firmware update surface. Shares the portal token system and presentation preferences. */
+.update-page .brand { text-decoration: none; }
+.update-page .update-back { display: inline-flex; gap: 8px; align-items: center; min-height: 44px; font: 11px var(--mono); text-decoration: none; padding: 10px 0 10px 10px; }
+.update-page .update-back .icon { width: 16px; height: 16px; }
+.update-page .update-back:hover { color: var(--accent); }
+#updateMain { max-width: 1080px; padding: 64px 40px 36px; margin: auto; }
+#updateMain .update-intro { position: relative; border-bottom: 1px solid var(--line); padding: 0 0 34px; margin-bottom: 42px; }
+#updateMain .update-intro h1 { font-size: clamp(42px, 6vw, 74px); letter-spacing: -.06em; }
+#updateMain .update-intro p { margin: 22px 0 0; font-size: 15px; }
+#updateMain .update-chip { position: absolute; right: 0; bottom: 38px; border: 1px solid var(--line); border-radius: 5px; color: var(--muted); padding: 7px 10px; font: 10px var(--mono); letter-spacing: .05em; }
+#updateMain .update-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 56px; align-items: start; }
+#updateMain .update-guide { padding-top: 6px; }
+#updateMain .update-steps { list-style: none; margin: 0; padding: 0; }
+#updateMain .update-steps li { display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 16px; padding: 23px 0; border-top: 1px solid var(--line); }
+#updateMain .step-number { font: 17px/1.5 var(--mono); color: var(--accent); }
+#updateMain .update-steps h2 { font-size: 17px; letter-spacing: -.025em; line-height: 1.4; margin: 0 0 10px; }
+#updateMain .update-steps p { font-size: 12px; line-height: 1.75; margin: 0; }
+#updateMain .update-upload { min-width: 0; border: 1px solid var(--line); border-radius: var(--radius); padding: 30px; background: var(--surface); }
+#updateMain .update-file-mark { display: flex; align-items: flex-end; gap: 18px; margin-bottom: 32px; }
+#updateMain .update-file-mark svg { width: 55px; height: 62px; color: var(--ink); }
+#updateMain .update-file-mark span { font: 23px var(--mono); color: var(--muted); letter-spacing: -.04em; margin-bottom: 2px; }
+#updateMain .update-upload .eyebrow { font-size: 9px; margin-bottom: 13px; }
+#updateMain .update-upload h2 { font-size: 28px; line-height: 1.12; }
+#updateMain .update-upload p { font-size: 13px; margin: 15px 0 28px; }
+#updateMain fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+#updateMain label { font-size: 12px; margin: 0 0 10px; }
+#updateMain input[type=file] { padding: 9px; min-height: 52px; font-size: 12px; border-radius: 9px; border-color: var(--control-line); margin: 0 0 20px; width: 100%; max-width: 100%; }
+#updateMain input::file-selector-button { border: 0; border-radius: 6px; background: var(--surface-raised); color: var(--ink); font: 600 11px var(--sans); padding: 10px; margin-right: 10px; cursor: pointer; }
+#updateMain form button { width: 100%; justify-content: space-between; min-height: 50px; border-radius: 9px; padding: 14px 18px; }
+#updateMain form button span { font-size: 18px; font-weight: 400; }
+#updateMain .update-note { text-align: center; font-size: 10px; line-height: 1.6; margin: 16px 0 0; }
+#updateMain .update-data { border-top: 1px solid var(--line); margin-top: 44px; padding: 16px 0; }
+#updateMain .update-data summary { min-height: 44px; display: flex; justify-content: space-between; gap: 16px; align-items: center; font-size: 13px; }
+#updateMain .update-data summary .icon { width: 16px; height: 16px; transition: transform .18s; }
+#updateMain .update-data[open] summary .icon { transform: rotate(180deg); }
+#updateMain .update-data p { max-width: 660px; font-size: 12px; margin: 16px 0 0; line-height: 1.7; }
+#updateMain footer { margin-top: 16px; }
+@media (max-width: 720px) {
+  #updateMain { padding: 34px 24px; }
+  #updateMain .update-layout { grid-template-columns: 1fr; gap: 25px; }
+  #updateMain .update-intro { margin-bottom: 30px; padding-bottom: 28px; }
+  #updateMain .update-intro h1 { font-size: clamp(40px, 9vw, 60px); }
+  #updateMain .update-intro p { font-size: 14px; }
+  #updateMain .update-chip { position: static; display: inline-block; margin-top: 20px; }
+  #updateMain .update-guide .eyebrow { margin-bottom: 16px; }
+  #updateMain .update-steps li { padding: 18px 0; grid-template-columns: 32px minmax(0, 1fr); gap: 13px; }
+  #updateMain .update-upload { padding: 26px; }
+  #updateMain .update-data { margin-top: 30px; }
+}
+@media (max-width: 420px) {
+  .update-page .app-header { padding: 0 16px; }
+  .update-page .brand { font-size: 19px; }
+  .update-page .header-right { gap: 3px; }
+  .update-page .update-back { font-size: 9px; gap: 3px; padding-left: 3px; }
+  #updateMain { padding: 30px 18px; }
+  #updateMain .update-upload { padding: 22px; }
+}
+@media (max-width: 350px) {
+  .update-page .brand { font-size: 18px; gap: 6px; }
+  .update-page .update-back span { max-width: 40px; }
+  #updateMain .update-upload { padding: 19px; }
+  #updateMain .update-upload h2 { font-size: 25px; }
+}

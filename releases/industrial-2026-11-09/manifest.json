@@ -1,0 +1,22 @@
+{
+  "ui_revision": "industrial-2026-11-09",
+  "application_version": "7.1.0-rc.7-esc-lights",
+  "installed_on_board": false,
+  "logic_and_api_unchanged": true,
+  "changed_baseline_files": [
+    "src/services/storm_update_page.h"
+  ],
+  "firmware_bytes": 1367680,
+  "firmware_sha256": "af4dc5a9f323967c53ae6acf6b2d498f957c928d956c87a753f346c75dc84c3b",
+  "checks": {
+    "behavior_tests": "32/32 PASS",
+    "browser_integration_chrome": "PASS",
+    "browser_integration_webkit": "PASS",
+    "responsive_theme_page_states": "40/40 PASS",
+    "updater_states": "8/8 PASS",
+    "build": "PASS",
+    "syntax": "PASS",
+    "generated_sources": "PASS"
+  },
+  "screenshots": "Simulated API fixtures; not a live device capture."
+}

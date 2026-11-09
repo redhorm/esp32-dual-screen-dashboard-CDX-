@@ -16,7 +16,9 @@
 #define DISP_A_RST     8   // Reset  (or -1 to omit)
 #define DISP_A_BL     46   // Backlight PWM; set -1 to tie BL → 3.3 V
 
-// DISPLAY B  ST7789   240×240  SPI3_HOST (HSPI)
+// DISPLAY B  copilot ST7789V 240×135 landscape.
+// Default profile is ST7789V native 135×240, landscape 240×135.
+// Module silk: GND VCC SCL SDA RES DC CS BLK.
 #define DISP_B_MOSI   13   // HSPI MOSI
 #define DISP_B_SCLK   14   // HSPI SCLK
 #define DISP_B_CS     15   // Chip Select
@@ -24,9 +26,35 @@
 #define DISP_B_RST    17   // Reset  (or -1)
 #define DISP_B_BL     18   // Backlight; set -1 to tie BL → 3.3 V
 
+// REAR LIGHT  WS2812/NeoPixel — separate regulated 5 V supply required.
+// GPIO is data only; never power the strip from an ESP32 pin.
+#define RTL_WS2812_PIN          4
+#define RTL_LED_COUNT          16
+#define RTL_LED_BRIGHTNESS     96
+#define RTL_COMMAND_TIMEOUT_MS 1500UL
+
+// ESC receiver signal capture. Enabled by default; install the
+// conditioned input first. A vehicle/receiver signal above 3.6 V must never
+// reach the ESP32.
+#define ESC_PWM_SIGNAL_PIN      5
+#define ESC_PWM_INPUT_ENABLED   1
+#define ESC_PWM_MIN_US        800U
+#define ESC_PWM_MAX_US       2200U
+#define ESC_PWM_TIMEOUT_US 100000UL
+#define ESC_PWM_REVERSE_US    1000U
+#define ESC_PWM_NEUTRAL_US    1500U
+#define ESC_PWM_FORWARD_US    2000U
+#define ESC_PWM_ENTER         0.12f
+#define ESC_PWM_EXIT          0.06f
+#define ESC_PWM_SMOOTH_MS       55U
+#define ESC_PWM_MAX_SLEW         8.0f
+#define ESC_NEUTRAL_DWELL_MS   180U
+#define ESC_REVERSE_CONFIRM_MS 220U
+#define ESC_REVERSE_ARM_MS    1600U
+
 // ----------------------------------------------------------------
 // ST7735  160×80  offset / inversion tuning
-// Most 160×80 IPS blue-PCB modules: col=26 row=1 invert=false BGR
+// Existing 160×80 IPS blue-PCB module: col=26 row=1 invert=true BGR
 // If image is wrong color → flip DISP_A_INVERT
 // If image is shifted     → adjust COL/ROW offsets
 // ----------------------------------------------------------------
@@ -37,11 +65,12 @@
 #define DISP_A_ROTATION      1    // 1/3 = landscape 160×80 (module native is portrait 80×160)
 
 // ----------------------------------------------------------------
-// ST7789  240×240
+// Copilot geometry and offsets have a single source of truth:
+// hal/copilot_display_profile.h (ST7789V 135×240, landscape 240×135).
+// The constants below describe media sizes used by the supplied panel.
 // ----------------------------------------------------------------
-#define DISP_B_INVERT      true   // almost all ST7789 modules need this
-#define DISP_B_RGB_ORDER  false
-#define DISP_B_ROTATION      0    // 0-3; adjust if display is upside-down
+#define COPILOT_SCREEN_WIDTH       240
+#define COPILOT_SCREEN_HEIGHT      135
 
 // ----------------------------------------------------------------
 // SPI clock speeds
@@ -52,8 +81,8 @@
 // ----------------------------------------------------------------
 // Frame-rate targets
 // ----------------------------------------------------------------
-#define DASH_FRAME_MS   33    // ~30 FPS  dashboard
-#define NAV_FRAME_MS    80    // ~12 FPS  navigator
+#define DASH_FRAME_MS   33    // ~30 FPS, valore collaudato sul display pilota
+#define NAV_FRAME_MS    66    // ~15 FPS; SHOW synchronizes both panels at DASH_FRAME_MS
 
 // ----------------------------------------------------------------
 // Unit preferences
@@ -66,10 +95,10 @@
 // Connect to this network and open http://192.168.4.1.  The captive
 // DNS also redirects common portal probes to the settings page.
 // ----------------------------------------------------------------
-#define CONFIG_AP_SSID        "ULTRA4-DASH"
-#define CONFIG_AP_PASSWORD    "ultra4setup"  // min 8 characters
-#define CONFIG_AP_CHANNEL      6
-#define CONFIG_AP_MAX_CLIENTS  2
+#define CONFIG_AP_SSID_PREFIX          "stormDASH"
+#define CONFIG_AP_CHANNEL               6
+#define CONFIG_AP_MAX_CLIENTS           2
+#define CONFIG_AP_REVEAL_PIN             0  // Hold BOOT while running to reveal
 
 // ----------------------------------------------------------------
 // Simulator limits
@@ -102,39 +131,23 @@
 // ----------------------------------------------------------------
 // Animation & FX (tutte le durate in ms)
 // ----------------------------------------------------------------
-// Boot sequence — dash: logo → sweep RPM → check; nav parte sfasato
-#define BOOT_LOGO_MS         900
-#define BOOT_SWEEP_MS       1300
-#define BOOT_CHECK_MS        800
-#define BOOT_NAV_DELAY_MS    800
-#define BOOT_NAV_ACQ_MS     2400
-#define BOOT_NAV_LOCK_MS     600
-#define BOOT_TOTAL_MS       3800   // ≥ fine di entrambe le timeline
+// Boot animation; both screens have one rendering owner
+#define BOOT_TOTAL_MS       1600   // animation time after initialization; no forced blocking delay
 
 // Shift light / redline
 #define REDLINE_RPM        6900.0f  // flash = rev limiter (7200)
-#define SHIFT_FLASH_MS       110   // semiperiodo lampeggio bordo/barra
 #define GEAR_SNAP_MS         100   // durata snap del numero marcia
 #define GEAR_SNAP_SCALE      1.3f  // scala iniziale dello snap (130%)
 
 // Waypoint alert
 #define ALERT_DIST_MI        0.20f // distanza di attivazione dal WP danger
-#define ALERT_PULSE_MS       250   // semiperiodo pulsazione riga/footer
 
 // Finish line
 #define FINISH_HOLD_MS      4000   // hold schermata risultato
-#define SAT_LOCK_COUNT        12   // satelliti a lock avvenuto
 
 // ----------------------------------------------------------------
-// Wow pass — smoothing, micro-vita, transizioni, compass tape
+// Simulation dynamics
 // ----------------------------------------------------------------
-// Easing dei valori visualizzati (tau in ms; attack/release separati)
-#define SPEED_SMOOTH_MS      120.0f  // inseguimento velocità dash
-#define RPM_ATTACK_MS         60.0f  // barra RPM: salita scattante...
-#define RPM_RELEASE_MS       400.0f  // ...discesa lenta (VU meter)
-#define NAV_VALUE_SMOOTH_MS  150.0f  // valori navigator (12 FPS)
-#define SCROLL_MS            260     // slide scroll roadbook
-
 // Micro-vita (rumore deterministico, seedabile)
 #define SIM_NOISE_SEED    0xC0FFEEu
 #define SIM_RPM_JITTER        40.0f  // ±rpm a regime
@@ -145,21 +158,8 @@
 #define SIM_TEMP_HEAT_RATE     0.45f // 1/s: scalda in fretta...
 #define SIM_TEMP_COOL_RATE     0.05f // ...raffredda piano
 #define SIM_ESC_HEAT_RATE      0.70f // ESC: massa termica piccola, spike rapidi
-#define VIB_MAX_PX             1     // tremolio barre (solo LIVE)
-#define VIB_PERIOD_MS         45
-
-// Transizioni di stato
-#define LIVE_WIPE_MS         450     // wipe BOOT→LIVE
-#define NAV_WIPE_LAG_MS      120     // il navigator segue la dash
-#define FINISH_SHUTDOWN_MS   700     // spegnimento sequenziale strumenti
-#define ALERT_IN_MS          180     // slide-in banner alert
-#define ALERT_OUT_MS         250     // fade-out banner alert
-
-// Compass tape (hero detail)
-#define TAPE_PX_PER_DEG        0.8f  // scala nastro: 72 px ≈ ±45° visibili
 
 // ----------------------------------------------------------------
 // Frame pacing / profiling
 // ----------------------------------------------------------------
-#define NAV_FRAME_SLOW_MS    120   // navigator rallentato durante FX dash
 #define PROFILE_LOG_MS      5000   // report frame time su seriale

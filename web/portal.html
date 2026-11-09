@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b0b0b">
+<meta name="color-scheme" content="dark light">
+<title>stormDASH / Control system</title>
+<style>/* INLINE_STYLE */</style>
+</head>
+<body data-theme="dark">
+<a class="skip-link" href="#appMain">Vai ai comandi</a>
+<svg class="icon-sprite" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><defs>
+<symbol id="i-home" viewBox="0 0 24 24"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/></symbol>
+<symbol id="i-trail" viewBox="0 0 24 24"><path d="M5 20h8a4 4 0 0 0 0-8H9a4 4 0 0 1 0-8h10M17 2l3 2-3 2"/><circle cx="5" cy="20" r="2"/></symbol>
+<symbol id="i-game" viewBox="0 0 24 24"><path d="M7 7h10c3 0 4 3 4 8s-3 4-5 1H8c-2 3-5 4-5-1s1-8 4-8zM7 10v4M5 12h4"/><circle cx="16" cy="11" r=".7"/><circle cx="18" cy="14" r=".7"/></symbol>
+<symbol id="i-spark" viewBox="0 0 24 24"><path d="m12 2 2.4 7.6L22 12l-7.6 2.4L12 22l-2.4-7.6L2 12l7.6-2.4zM21 2v4M19 4h4"/></symbol>
+<symbol id="i-tune" viewBox="0 0 24 24"><path d="M4 7h7M15 7h5M4 17h3M11 17h9"/><circle cx="13" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></symbol>
+<symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14m-6-6 6 6-6 6"/></symbol>
+<symbol id="i-chevron" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></symbol>
+<symbol id="i-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+<symbol id="i-play" viewBox="0 0 24 24"><path d="m8 4 12 8-12 8z"/></symbol>
+<symbol id="i-pause" viewBox="0 0 24 24"><path d="M8 4v16M16 4v16"/></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+<symbol id="i-screen" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></symbol>
+<symbol id="i-light" viewBox="0 0 24 24"><path d="M8 16c-5-5-2-12 4-12s9 7 4 12M9 17h6M9 20h6M10 23h4M1 9h2M21 9h2M3 2l2 2M19 4l2-2"/></symbol>
+<symbol id="i-wifi" viewBox="0 0 24 24"><path d="M2 8a16 16 0 0 1 20 0M5 12a11 11 0 0 1 14 0M8 16a6 6 0 0 1 8 0"/><circle cx="12" cy="20" r=".7"/></symbol>
+<symbol id="i-eye" viewBox="0 0 24 24"><path d="M2 12c5-9 15-9 20 0-5 9-15 9-20 0z"/><circle cx="12" cy="12" r="3"/></symbol>
+<symbol id="i-wave" viewBox="0 0 24 24"><path d="M2 9c4-7 6 7 10 0s6 7 10 0M2 16c4-7 6 7 10 0s6 7 10 0"/></symbol>
+<symbol id="i-cube" viewBox="0 0 24 24"><path d="m12 2 9 5v10l-9 5-9-5V7zm0 0v10m-9-5 9 5 9-5M12 12v10"/></symbol>
+<symbol id="i-music" viewBox="0 0 24 24"><path d="M9 18V5l11-3v13M9 9l11-3"/><ellipse cx="6" cy="18" rx="3" ry="2"/><ellipse cx="17" cy="15" rx="3" ry="2"/></symbol>
+<symbol id="i-flag" viewBox="0 0 24 24"><path d="M5 22V3c5-5 9 5 15 0v10c-6 5-10-5-15 0"/></symbol>
+<symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></symbol>
+</defs></svg>
+<header class="app-header">
+  <div class="brand"><svg class="brand-mark" viewBox="0 0 28 28" aria-hidden="true"><circle cx="4" cy="4" r="2"/><circle cx="14" cy="4" r="2"/><circle cx="24" cy="4" r="2"/><circle cx="4" cy="14" r="2"/><circle cx="14" cy="14" r="2"/><circle cx="24" cy="14" r="2"/><circle cx="4" cy="24" r="2"/><circle cx="14" cy="24" r="2"/><circle cx="24" cy="24" r="2"/></svg><span>stormDASH</span><small>COCKPIT CONTROL</small></div>
+  <div class="header-right"><div id="status" role="status" aria-label="Connessione al cruscotto">Connessione…</div><button id="themeToggle" class="icon-button" type="button" aria-label="Attiva tema chiaro" aria-pressed="false"><svg class="icon theme-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 13A9 9 0 0 1 11 3.5 9 9 0 1 0 20.5 13Z"/></svg><svg class="icon theme-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></svg></button><button class="icon-button" data-go="pit" aria-label="Apri Pit e impostazioni"><svg class="icon" aria-hidden="true"><use href="#i-tune"/></svg></button></div>
+</header>
+<div class="app-shell">
+  <div class="utility-strip"><p id="displayMode">TFT: in attesa del cruscotto</p><span class="local-badge"><svg class="icon" aria-hidden="true"><use href="#i-wifi"/></svg> Connessione locale</span></div>
+  <div id="message" role="status" aria-live="polite" aria-atomic="true"></div>
+  <div id="networkHelp" class="notice hidden">Collegati al Wi-Fi <strong>stormDASH</strong> e apri <strong>192.168.4.1</strong>. Resta connesso anche senza Internet. I dati mostrati sono gli ultimi ricevuti: il timer continua sul cruscotto.</div>
+  <main tabindex="-1" id="appMain" data-page="home">
+  <section id="home" aria-label="Panoramica cockpit">
+    <div class="hero">
+      <div class="hero-copy"><span class="eyebrow">01 / CONTROL SYSTEM</span><h1>Nel tuo<br><span class="gradient-text">elemento.</span></h1><p>Il percorso. Gli strumenti. La luce.<br>Tutto sotto il tuo controllo.</p><div class="hero-actions"><button class="primary" data-go="trail" id="homeTrailAction">Entra in Trail</button><button class="button-inline quiet" data-action="show"><svg class="icon" aria-hidden="true"><use href="#i-play"/></svg>Avvia lo show</button></div></div>
+      <div class="hero-art"><!-- ART:instrument --><div class="hero-caption"><span><i></i>DUE DISPLAY</span><span><i></i>UN SOLO COCKPIT</span><span><i></i>100% LOCALE</span></div></div>
+    </div>
+    <div class="section-heading"><div><h2>Il cockpit, adesso.</h2><p>Sessione e accesso rapido ai controlli.</p></div></div>
+    <div class="home-grid">
+      <article class="card home-session"><div class="card-label"><svg class="icon" aria-hidden="true"><use href="#i-trail"/></svg>TRAIL SESSION</div><strong id="homeTimer">—</strong><div id="homeSession">In attesa del cruscotto</div><button class="home-session-action" data-go="trail" aria-label="Apri Trail Session"><svg class="icon" aria-hidden="true"><use href="#i-arrow"/></svg></button></article>
+      <div class="home-mini-stack"><button class="mini-card" data-go="wow"><span class="tile-icon"><svg class="icon" aria-hidden="true"><use href="#i-screen"/></svg></span><span><strong>Display</strong><small id="homeDisplay">In attesa</small></span><svg class="icon" aria-hidden="true"><use href="#i-chevron"/></svg></button><button class="mini-card" data-go="pit"><span class="tile-icon"><svg class="icon" aria-hidden="true"><use href="#i-tune"/></svg></span><span><strong>Setup</strong><small>Luci, display e preferenze</small></span><svg class="icon" aria-hidden="true"><use href="#i-chevron"/></svg></button></div>
+    </div>
+    <div class="section-heading"><div><h2>Esperienze / 05</h2><p>Un altro lato del tuo cockpit.</p></div><button class="text-link" data-go="wow">Esplora WOW ↗</button></div>
+    <article class="experience-teaser"><div><span class="eyebrow">04 / VISUAL LAB</span><h2>Oltre<br>gli strumenti.</h2><p>Cinque esperienze.<br>Due display, un sistema.</p><button class="quiet" data-go="wow">Scopri le esperienze</button></div><div class="experience-art" aria-hidden="true"><!-- ART:eyes --></div></article>
+    <div class="home-bottom"><svg class="icon" aria-hidden="true"><use href="#i-wifi"/></svg><span id="homeConnection">Connessione al cockpit…</span></div>
+  </section>
+  <section id="trail" class="hidden" aria-label="Trail Session">
+    <div class="page-heading"><span class="eyebrow">02 / TRAIL SESSION</span><h1>Segui la<br><span class="gradient-text">traccia.</span></h1><p>Concentrati sul percorso. Tempo, gate e penalità li tieni qui.</p></div>
+    <div class="page-layout"><div>
+      <article class="card session-card"><div class="session-top"><span class="session-status"><i class="status-dot" aria-hidden="true"></i><span id="trailState">Pronto per partire</span></span><span class="tag">MANUALE</span></div><div class="time" id="time">00:00</div><div class="counts"><div class="count-gates"><strong id="gates">0</strong><small>Gate</small></div><div class="count-penalties"><strong id="penalties">0</strong><small>Penalità</small></div><div><strong id="score">0</strong><small>Punti · meno è meglio</small></div></div>
+        <div class="row start-row"><button id="start" class="primary" data-action="start"><svg class="icon" aria-hidden="true"><use href="#i-play"/></svg>Avvia il giro</button><button id="pause" class="hidden primary" data-action="pause"><svg class="icon" aria-hidden="true"><use href="#i-pause"/></svg>Pausa</button><button id="resume" class="hidden primary" data-action="resume"><svg class="icon" aria-hidden="true"><use href="#i-play"/></svg>Riprendi</button></div>
+        <div class="row event-row"><button id="gate" data-action="gate"><svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>Gate</button><button id="penalty" data-action="penalty"><svg class="icon" aria-hidden="true"><use href="#i-plus"/></svg>Penalità</button></div><div class="row secondary-row"><button id="undo" data-action="undo">Annulla evento</button><button id="finish" data-action="finish">Chiudi sessione</button></div>
+      </article>
+      <div class="display-shortcuts"><button data-action="board"><svg class="icon" aria-hidden="true"><use href="#i-flag"/></svg>Tabellone TFT</button><button data-action="exit"><svg class="icon" aria-hidden="true"><use href="#i-screen"/></svg>Strumenti</button></div>
+    </div><div>
+      <details class="section-card"><summary><span class="summary-copy">Le tue regole<small>Peso delle penalità e punteggio</small></span><svg class="icon" aria-hidden="true"><use href="#i-down"/></svg></summary><div class="detail-body"><p>Ogni gate vale −1. Ogni penalità vale il peso scelto. Il punteggio più basso è il migliore.</p><label for="weight">Peso penalità</label><input id="weight" inputmode="numeric" step="1" required type="number" min="0" max="100" value="5"><button id="rules">Applica alla prossima sessione</button><p class="help-note">Regole personali, senza conformità sportiva dichiarata. Massimo 128 eventi e 24 ore per sessione.</p></div></details>
+      <details class="section-card"><summary><span class="summary-copy">Risultati da portare con te<small>Storico, card e condivisione</small></span><svg class="icon" aria-hidden="true"><use href="#i-down"/></svg></summary><div class="detail-body"><label for="model">Nome del modello sulla card</label><input id="model" maxlength="32" value="Il mio crawler"><div class="row"><button id="card">Crea la card</button><a class="button" href="/api/storm/history">Scarica CSV</a></div><p id="history"></p><button id="historyButton">Vedi risultati</button><div id="results"></div></div></details>
+      <p class="help-note">Il tempo continua sul cruscotto anche senza telefono. <strong>Chiudi la sessione per salvarla</strong>: un riavvio interrompe quella ancora aperta.</p>
+    </div></div>
+  </section>
+  <section id="arcade" class="hidden" aria-label="Arcade e show">
+    <div class="page-heading"><span class="eyebrow">03 / ARCADE</span><h1>Entra<br><span class="gradient-text">in gioco.</span></h1><p>L’azione sui TFT. Il controllo nelle tue mani.</p></div>
+    <div class="arcade-layout"><div>
+      <article class="arcade-art"><!-- ART:track --><div class="arcade-art-caption"><strong>NIGHT STAGE</strong><p>45 secondi. Un salto alla volta.<br>Supera le rocce e limita gli urti.</p></div></article>
+      <article class="card show-card"><div class="show-orb" aria-hidden="true"><svg class="icon"><use href="#i-spark"/></svg></div><div><h3>Portal Link.</h3><p>Portal Link. Sei secondi, due schermi,<br>un unico spettacolo.</p><button data-action="show">Avvia lo show</button></div></article>
+    </div><div>
+      <article class="card controller-card"><div class="controller-label"><span class="eyebrow">IL TUO CONTROLLER</span><svg class="icon" aria-hidden="true"><use href="#i-game"/></svg></div><h2>Il tuo controller.</h2><p>Avvia la partita, poi tocca SALTA.<br>Puoi usare anche BOOT sul cruscotto.</p><div class="row"><button id="game" class="primary">Gioca / riavvia</button><button data-action="exit" class="quiet">Esci</button></div><button id="jump" aria-label="Salta con il buggy">SALTA</button><p id="gameState">BOOT breve = salto. BOOT lungo = esci.</p><details class="controller-details"><summary>Percorso e comandi</summary><label for="seed">Percorso / seed</label><input id="seed" inputmode="numeric" step="1" required type="number" min="1" max="4294967295" value="1"><p>Lo stesso numero ricrea lo stesso percorso. Cambiando sezione o perdendo il collegamento, il gioco si mette in pausa. SALTA lo riprende; BOOT permette il controllo locale. Tienilo premuto 2 secondi per uscire.</p></details></article>
+      <p class="help-note">Gioca con il modello fisicamente in sicurezza. Il neutro PWM non prova che sia fermo. Nessun comando viene inviato a motore o servo.</p>
+    </div></div>
+  </section>
+  <section id="wow" class="hidden" aria-label="Esperienze WOW">
+    <div class="page-heading"><span class="eyebrow">04 / VISUAL LAB</span><h1>Sperimenta.<br><span class="gradient-text">Esplora.</span></h1><p>Movimento, luce e suono. Scegli un’esperienza per i tuoi display.</p></div>
+    <div class="wow-gallery-heading"><span class="eyebrow neutral">SCEGLI UN’ESPERIENZA</span><small>Scorri per esplorarle</small></div>
+    <div id="wowGallery" class="wow-grid" role="group" aria-label="Modalità WOW">
+      <button class="wow-choice" data-wow="midnight" data-mode="5" aria-pressed="false"><span class="mode-art"><!-- ART:track --></span><span class="mode-copy"><strong>MIDNIGHT RUN</strong><small>La tua corsa al tramonto</small></span></button>
+      <button class="wow-choice" data-wow="living" data-mode="6" aria-pressed="false"><span class="mode-art"><!-- ART:eyes --></span><span class="mode-copy"><strong>LIVING COCKPIT</strong><small>In ottima compagnia</small></span></button>
+      <button class="wow-choice" data-wow="liquid" data-mode="7" aria-pressed="false"><span class="mode-art"><!-- ART:field --></span><span class="mode-copy"><strong>LIQUID REACTOR</strong><small>Dai forma alla luce</small></span></button>
+      <button class="wow-choice" data-wow="garage" data-mode="8" aria-pressed="false"><span class="mode-art"><!-- ART:wireframe --></span><span class="mode-copy"><strong>GARAGE 3D</strong><small>Un’altra prospettiva</small></span></button>
+      <button class="wow-choice" data-wow="beat" data-mode="9" aria-pressed="false"><span class="mode-art"><!-- ART:signal --></span><span class="mode-copy"><strong>BEAT STORM</strong><small>La musica prende luce</small></span></button>
+    </div>
+    <div id="wowIdle" class="wow-empty"><svg class="icon" aria-hidden="true"><use href="#i-spark"/></svg><div><strong>Scegli un’esperienza.</strong><p>Seleziona una scheda. Qui troverai i suoi controlli.</p></div></div>
+    <article id="midnightPanel" class="card wow-panel hidden"><span class="eyebrow">60 SECONDI DI ADRENALINA</span><div class="control-lead"><h2>MIDNIGHT RUN</h2><svg class="icon" aria-hidden="true"><use href="#i-game"/></svg></div><p>Accelerazione automatica. Tieni premuta una freccia, segui le curve e limita gli urti.</p><div id="midnightState" class="wow-stats" role="status">In attesa del cruscotto.</div><div class="seed-row"><label for="midnightSeed">Percorso / seed</label><input id="midnightSeed" inputmode="numeric" step="1" required type="number" min="1" max="4294967295" value="1"></div><div class="row"><button id="midnightStart" class="primary">Gioca / riavvia</button><button id="midnightResume" class="quiet">Riprendi</button></div><div class="row" role="group" aria-label="Sterzo di MIDNIGHT RUN"><button id="steerLeft" class="steer" aria-label="Sterza a sinistra" aria-pressed="false">◀</button><button id="steerRight" class="steer" aria-label="Sterza a destra" aria-pressed="false">▶</button></div><small class="panel-bottom">Lasciando questa sezione o perdendo il collegamento, la corsa si mette in pausa. Gioca con il modello in sicurezza.</small></article>
+    <article id="livingPanel" class="card wow-panel hidden"><span class="eyebrow">UN COCKPIT CON CARATTERE</span><div class="control-lead"><h2>LIVING COCKPIT</h2><svg class="icon" aria-hidden="true"><use href="#i-eye"/></svg></div><p>Segue il tuo sguardo, reagisce al tuo percorso. Fagli vedere il mondo con un dito.</p><div id="livingPad" class="pad" role="slider" tabindex="0" aria-label="Direzione dello sguardo: trascina oppure usa le frecce" aria-valuemin="0" aria-valuemax="255" aria-valuenow="128"><svg class="icon" aria-hidden="true"><use href="#i-eye"/></svg><span>Trascina per guardarti intorno</span></div><div class="row"><button id="livingBlink" class="primary">Fai l’occhiolino</button></div></article>
+    <article id="liquidPanel" class="card wow-panel hidden"><span class="eyebrow">LASCIATI TRASPORTARE</span><div class="control-lead"><h2>LIQUID REACTOR</h2><svg class="icon" aria-hidden="true"><use href="#i-wave"/></svg></div><p>Una corrente luminosa che segue il dito. Un tocco e l’energia cambia forma.</p><div id="liquidPad" class="pad" role="slider" tabindex="0" aria-label="Corrente luminosa: trascina oppure usa le frecce" aria-valuemin="0" aria-valuemax="255" aria-valuenow="128"><svg class="icon" aria-hidden="true"><use href="#i-wave"/></svg><span>Trascina per muovere la luce</span></div><div class="row"><button id="liquidWave" class="primary">Crea un’onda</button></div><small class="panel-bottom">La corrente segue il dito. Non serve inclinare il cruscotto.</small></article>
+    <article id="garagePanel" class="card wow-panel hidden"><span class="eyebrow">GUARDALO DA OGNI LATO</span><div class="control-lead"><h2>GARAGE 3D</h2><svg class="icon" aria-hidden="true"><use href="#i-cube"/></svg></div><p>Ruota il buggy, separa i componenti e scopri una nuova prospettiva.</p><div id="garagePad" class="pad" role="slider" tabindex="0" aria-label="Rotazione del buggy: trascina oppure usa le frecce" aria-valuemin="0" aria-valuemax="255" aria-valuenow="128"><svg class="icon" aria-hidden="true"><use href="#i-cube"/></svg><span>Trascina per ruotare il buggy</span></div><div class="row"><button id="garageExplode" class="primary">Separa i componenti</button><button id="garageAssemble" class="quiet">Ricomponi</button></div><small class="panel-bottom">Un modello 3D originale e stilizzato, creato per stormDASH.</small></article>
+    <article id="beatPanel" class="card wow-panel hidden"><span class="eyebrow">IL TUO RITMO. LA SUA LUCE.</span><div class="control-lead"><h2>BEAT STORM</h2><svg class="icon" aria-hidden="true"><use href="#i-music"/></svg></div><p>Scegli un brano. Il telefono suona, i TFT e i sedici punti del cockpit seguono il ritmo.</p><label for="beatFile">File audio dal telefono · massimo 30 MB</label><input id="beatFile" type="file" accept="audio/*,.mp3,.wav,.m4a,.ogg,.aac,.flac"><p id="beatFileName">Nessun brano selezionato.</p><div class="beat-meter" aria-hidden="true"><span id="beatBand0"></span><span id="beatBand1"></span><span id="beatBand2"></span><span id="beatBand3"></span></div><div class="row"><button id="beatPlay" class="primary">Riproduci</button><button id="beatStop" class="quiet">Ferma</button></div><p id="beatState" role="status">Scegli un file, poi tocca Riproduci.</p><small class="panel-bottom">Il file resta sul telefono. Nessun upload, account o microfono. Lasciando questa sezione la musica si ferma.</small></article>
+    <div class="wow-exit"><button data-action="exit">Torna agli strumenti</button><small>BOOT breve interagisce con l’effetto.<br>Tienilo premuto 2 secondi per uscire.</small></div>
+  </section>
+  <section id="pit" class="hidden" aria-label="Pit, luci e impostazioni">
+    <div class="page-heading"><span class="eyebrow">05 / PIT & SETUP</span><h1>Ogni dettaglio.<br><span class="gradient-text">A modo tuo.</span></h1><p>Strumenti ESC, luci e display. Ogni funzione nel suo spazio.</p></div>
+    <!-- PIT_CONTROLS -->
+  </section>
+  </main>
+  <footer><div><strong>stormDASH</strong>DUAL DISPLAY / LOCAL CONTROL</div><div class="footer-right">Trail manuale · Strumenti scenografici<br>ESC e luci · PWM condiviso</div></footer>
+</div>
+<nav class="dock" aria-label="Sezioni principali">
+  <button data-tab="home" class="active" aria-pressed="true" aria-current="page" aria-controls="home"><svg class="icon" aria-hidden="true"><use href="#i-home"/></svg><span>Home</span></button>
+  <button data-tab="trail" aria-pressed="false" aria-controls="trail"><svg class="icon" aria-hidden="true"><use href="#i-trail"/></svg><span>Trail</span></button>
+  <button data-tab="arcade" aria-pressed="false" aria-controls="arcade"><svg class="icon" aria-hidden="true"><use href="#i-game"/></svg><span>Arcade</span></button>
+  <button data-tab="wow" aria-pressed="false" aria-controls="wow"><svg class="icon" aria-hidden="true"><use href="#i-spark"/></svg><span>WOW</span></button>
+  <button data-tab="pit" aria-pressed="false" aria-controls="pit"><svg class="icon" aria-hidden="true"><use href="#i-tune"/></svg><span>Pit & setup</span></button>
+</nav>
+<script>/* INLINE_SCRIPT */</script>
+<script>/* PIT_SCRIPT */</script>
+<script>/* PRESENTATION_SCRIPT */</script>
+</body>
+</html>

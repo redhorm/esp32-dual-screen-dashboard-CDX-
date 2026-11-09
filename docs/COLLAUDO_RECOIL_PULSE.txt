@@ -1,0 +1,240 @@
+RECOIL PULSE — VERIFICHE E COLLAUDO
+Firmware 6.0.0-rc.2
+
+Questo documento distingue i controlli software ripetibili dalle prove che
+richiedono i display, la scheda e il modello montato. Una compilazione riuscita
+non certifica orientamento, colori, allineamento ottico o tempi sulla scheda.
+Il flash rc.2 e il mount dell’archivio ripristinato sono verificati via seriale;
+la resa dei LCD e il montaggio richiedono ancora osservazione diretta.
+
+
+1. ANALISI E CONTRATTI CONTROLLATI
+
+Letti il firmware applicativo, il nucleo logico, i driver dei display, input
+ESC, RTL, persistenza, PhotoStore, vecchio gioco, test e script di flash.
+Gli array binari dei vecchi font sono stati verificati come asset, senza
+trattarli come codice di controllo.
+
+Contratti conservati nel sorgente:
+- pin e profili TFT esistenti, pilota 160×80 e copilota 240×135;
+- sedici centri pixel ricavati dal file di coordinate della maschera;
+- ingresso ESC GPIO5 in sola lettura;
+- timeout per segnale PWM assente e scadenza dei comandi manuali RTL;
+- impostazioni con CRC/copia di riserva; LittleFS inizializzata al boot solo
+  dopo verifica completa della partizione vuota, mai sopra dati esistenti;
+- nessun framebuffer aggiuntivo per SHOW o accensione animata.
+
+I due sprite RGB565 nominali occupano 25.600 + 64.800 = 90.400 byte, esclusi
+oggetti, buffer SPI e sistema. È un calcolo dalle dimensioni, non una misura
+dell'heap libero del dispositivo. Stato ShowSequence 8 byte e ShowFrame
+20 byte nella build host verificata.
+
+Verifica rc.2: 133/133 test nativi passati, compilazione ESP32-S3 riuscita.
+Flash applicazione: 978.021 / 3.145.728 byte (31,1%).
+RAM statica: 55.276 / 327.680 byte (16,9%). File firmware.bin: 978.384 byte.
+La suite comprende 120 test precedenti, 1 sulla fine dell’avvio, 5 sulla
+partizione vuota e 7 sull’accensione animata.
+Sono passati anche 8/8 test del caricatore precompilato, il confronto CAD
+e i controlli di sintassi JavaScript/Python.
+La RAM statica esclude i 90.400 byte degli sprite e altre allocazioni dinamiche.
+La suite originaria aveva 114 test, inclusi quelli del gioco ora
+rimosso. Il nuovo motore SHOW ha test dedicati per sequenza, stop, riavvio,
+scadenza, rendering italiano/inglese e overflow del contatore temporale.
+Sono verificati anche pressione breve/lunga BOOT e contratto delle coordinate.
+I nuovi controlli coprono renderer IQ3/HDS, rallentamento del simulatore,
+conversione dei dati strumenti, velocità condivisa, distanza integrata e
+attraversamento dei waypoint. La verifica CAD dei sedici punti e della
+finestra è passata.
+
+Anteprime della precedente rc.1: normale, 300 fotogrammi e 20.000 ms; SHOW,
+270 fotogrammi, durata GIF 18.000 ms. Rendering controllato senza pixel fuori
+dallo schermo. Sono verifiche del codice su host, non FPS o misure SPI della
+scheda, né una prova della luce attraverso la maschera stampata.
+
+La nuova accensione rc.2 ha 7 test nativi passanti e un’anteprima C++
+di 84 fotogrammi renderizzati e 58 frame GIF codificati, 5.600 ms,
+840×1070 pixel; i fotogrammi identici sono accorpati senza cambiare la durata. Le immagini ingrandiscono i
+pannelli reali per l’ispezione; non sono una misura di FPS hardware.
+
+Prima degli aggiornamenti rc.2 al testo dell’avvio, il portale è stato
+provato a 390×844 con API simulate: SHOW start/stop,
+salvataggio IT/EN, archivio offline, perdita connessione e cursori con nome
+accessibile, senza errori JavaScript. Non è un collaudo radio o server fisico.
+Ripristino hardware rc.2 riuscito dopo backup: sei JPEG Recoil recuperati
+tramite metadata+CTZ e reimpacchettati in LittleFS; SHA-256 di tutti e sei
+identici dopo pack/unpack. Il filesystem storico con 68 risorse resta nel
+backup separato sul Mac, senza essere copiato sulla scheda. NVS non riscritta.
+La seriale conferma LittleFS ready, totale 5.177.344 byte, usati 122.880 byte,
+formatted0/recovered0, AP pronto e accensione completata. Il nuovo archivio
+si monta normalmente; la policy automatica di memoria vuota non è stata
+la soluzione usata per questo backup, che conteneva dati.
+
+Quattro campioni seriali consecutivi: pilota 29 FPS, copilota 14 FPS, heap libero
+146.192 byte, minimo 144.004 byte, storage=ready ed error=none. Startup passa
+da 1 a 0; nessun reset o panic nei 30 secondi osservati. Sono contatori del
+firmware in esecuzione, non misure ottiche o prove prolungate. La resa dei LCD non è
+stata osservata direttamente; l’upload Wi-Fi dal Mac non è stato provato,
+perché il Mac non era collegato alla rete del dispositivo.
+
+
+2. VERIFICHE SOFTWARE RIPETIBILI
+
+Eseguire dalla cartella con platformio.ini, usando PlatformIO installato:
+  pio test -e native
+  pio run -e esp32-s3-devkitc-1
+  python3 tools/generate_recoil_geometry.py --check
+  python3 tools/test_flash_precompiled.py
+
+Verifica del percorso di caricamento senza scrivere alla scheda:
+  python3 tools/flash_dashboard.py --dry-run --flash --port PORTA_TEST
+
+Per il pacchetto completo con BINARI accanto alla cartella del progetto:
+  python3 tools/flash_precompiled.py --dry-run --port PORTA_TEST
+Questo secondo comando controlla manifest, checksum e partizioni dei file
+precompilati, senza esptool, accesso USB o scrittura alla scheda.
+
+Controllare:
+- test tutti passanti e compilazione/link riusciti;
+- la geometria generata coincide con il contratto delle coordinate;
+- il normale aggiornamento non aggiunge erase-flash o uploadfs;
+- la verifica LittleFS blocca l’inizializzazione anche con un solo byte
+  diverso da 0xFF in fondo alla partizione o con una lettura fallita;
+- l'API SHOW valida action=start|stop e non riavvia una sequenza per un
+  comando start duplicato; stato richiesto e stato attivo sono distinguibili;
+- SHOW dura 18.000 ms in base al tempo trascorso, anche se un frame arriva
+  in ritardo o il contatore a 32 bit attraversa lo zero;
+- accensione animata di 5.600 ms distinta da SHOW, con fasi e scadenza
+  calcolate dal tempo e senza dipendenza da LittleFS;
+- i testi DEMO compaiono in tutte le fasi e anche nel cruscotto normale;
+- il quadro IQ3 mantiene numeri, contagiri e punti dentro il contratto CAD;
+- la carta HDS mantiene rotta, traccia e waypoint nello stesso riferimento
+  spaziale; il passaggio km/mi converte dati e scala senza spostare la rotta;
+- lo stato sintetico di SHOW non entra nella macchina di controllo RTL/ESC.
+
+La preview prodotta dal renderer permette di ispezionare il disegno effettivo
+e le coordinate. Non simula SPI, inversione dei colori, retroilluminazione,
+sfocatura ottica, latenza Wi-Fi o refresh fisico del pannello.
+
+
+3. PRIMO AVVIO SULLA SCHEDA — DA ESEGUIRE SUL DISPOSITIVO
+
+Prima prova con USB dati e collegamenti TFT esistenti, senza cambiare i pin.
+Se sono presenti RTL o ingresso ESC, lasciare la propulsione del modello
+disabilitata durante le verifiche da banco.
+
+1. Avviare senza tenere BOOT. Annotare versione e motivo dell'ultimo reset.
+2. Verificare l’accensione: pilota con segmenti/punti accesi per 1 s,
+   banner per 3 s e strumenti a riposo fino a 5,6 s; copilota con introduzione
+   per 3 s, comparsa della carta e carta ferma fino alla fine. Il conteggio
+   parte dopo l’eventuale immagine personale e il setup, non dall’alimentazione.
+   Controllare entrambi i pannelli: bordi completi, colori corretti, testo
+   diritto, nessuna colonna tagliata. Il profilo copilota atteso è 240×135.
+3. Accedere alla rete già configurata e a http://192.168.4.1.
+4. Se non si conosce la password, tenere BOOT per 2 s a firmware avviato:
+   rete/password devono comparire per 15 s. Il rilascio dopo la pressione
+   lunga non deve avviare SHOW.
+5. Variare luminosità A e B, lingua e unità; salvare, riavviare e verificare
+   persistenza. La configurazione del veicolo è opzionale.
+6. Su una partizione realmente vuota verificare il primo avvio rc.2:
+   archivio disponibile e formattedOnBegin=true; al riavvio successivo
+   mount normale e formattedOnBegin=false. Con media esistenti verificarne
+   la conservazione. Se LittleFS resta indisponibile, dashboard, portale,
+   accensione animata e SHOW devono restare operativi e l'errore leggibile.
+   Non inizializzare i media solo per aggirare un problema diverso.
+
+Se un display non risponde, il successo di inizializzazione nel software
+non basta: SPI non fornisce una conferma della presenza fisica di questi
+moduli. Controllare alimentazione, massa, pad, pin e profilo effettivi.
+
+
+4. SHOW, INTERAZIONI E RECUPERO — DA ESEGUIRE SUL DISPOSITIVO
+
+- Durante l’accensione animata: BOOT breve deve passare allo SHOW e BOOT
+  lungo deve mostrare il Wi-Fi. Provare anche AVVIA SHOW e CALIBRA MASCHERA
+  dal portale. Tornando all’uso normale l’accensione non deve ricominciare.
+- Con immagine personale attiva, controllare che preceda l’accensione. Con
+  immagine disattiva o archivio offline, l’animazione deve funzionare comunque.
+- BOOT breve: avvio SHOW riconoscibile entro i primi 2 s, sedici punti accesi
+  progressivamente; niente riavvio di ESP32 o disconnessione del portale.
+- A 8 s: picco delle luci di cambiata e indicazione PULSE LINK. Tra 8 e 10 s
+  verificare la svolta al waypoint, cambio COG 0→45 e nuova distanza DTW.
+  La carta deve avanzare in accordo alla velocità dei due strumenti.
+- A 18 s: ritorno automatico al cruscotto precedente.
+- Interrompere a 1 s, 7 s e 12 s con BOOT; ripetere dal portale.
+- Dopo ogni stop, avviare nuovamente: la sequenza riparte dall'inizio.
+- Premere rapidamente due volte il comando web: nessuna sequenza accodata
+  e nessun avvio inatteso dopo il ritorno al cruscotto.
+- Con due telefoni connessi, verificare che lo stato attivo venga aggiornato
+  per entrambi. Dopo una perdita di rete la pagina deve indicare l'errore,
+  senza fingere che il comando sia stato eseguito.
+- Ripetere 20 cicli completi alternati a 20 interruzioni. Annotare reset,
+  heap minimo e blocco contiguo maggiore dalla diagnostica.
+- Provare la pressione lunga di BOOT durante SHOW e il ritorno al termine
+  della schermata credenziali: nessun flash di password nella sequenza.
+
+Il motore software è non bloccante; il tempo percepito tra comando e disegno
+va misurato con HTTP e periferiche reali. Annotare eventuali pause durante
+salvataggi o logo di avvio, senza attribuirle al renderer per deduzione.
+
+
+5. MASCHERA E LEGGIBILITÀ — DA ESEGUIRE CON IL MONTAGGIO FINALE
+
+Usare la maschera pilota definitiva, display incassato e viti serrate.
+IMPOSTAZIONI → CALIBRA MASCHERA:
+- ogni foro deve mostrare il relativo punto, anche agli estremi dell'arco;
+- nessuna luce deve finire sotto una parte opaca per un disallineamento;
+- la finestra deve mostrare tutti i testi senza tagli ai bordi;
+- nessun testo o effetto deve invadere le sedici aperture.
+
+Ripetere durante il picco a 8 s e durante la svolta. Verificare DEMO su
+entrambi i pannelli senza dover smontare la cornice. Provare una ripresa
+verticale alla distanza prevista: contrasti e testi vanno giudicati dal
+video del dispositivo, non solo dall'anteprima ingrandita sul computer.
+
+Per la maschera fine: ugello 0,25 mm e layer 0,10 mm sono indicazioni del
+progetto, non una garanzia universale della tolleranza di stampa. Non
+alterare le coordinate firmware prima di controllare il montaggio.
+
+
+6. RTL E INGRESSO ESC OPZIONALI — DA ESEGUIRE SOLO SE COLLEGATI
+
+Usare il segnale già condizionato a 3,3 V e l'alimentazione LED prevista.
+Non collegare un segnale ricevente a tensione sconosciuta direttamente al
+GPIO5. Il firmware non comanda l'ESC.
+
+- Segnale assente: NO SIGNAL, nessuna falsa velocità misurata.
+- Impulsi validi: controllare neutro, avanti, frenata e retromarcia secondo
+  la macchina a stati esistente e la calibrazione dei tempi impulso.
+- Scollegare il segnale: rilevamento assenza entro il timeout configurato
+  di 100 ms, oltre alla cadenza del task e al refresh della visualizzazione.
+- Con un comando manuale luci attivo, perdere il Wi-Fi: scadenza dopo 1,5 s
+  senza keepalive. Verificare anche cambio pagina e sospensione del telefono.
+- Il pit test richiede un segnale reale valido e neutro stabile; non deve
+  considerare valida la sola simulazione grafica.
+- Avviare SHOW in questi casi: nessun nuovo comando motore, nessun input
+  ESC sintetico e nessuna sospensione della protezione temporale RTL.
+
+
+7. MEMORIA, FILE E PROVE NON COPERTE DAL COMPILATORE
+
+Registrare prima, durante e dopo SHOW dalla diagnostica:
+FPS A/B, tempo medio/massimo di rendering e trasferimento, heap libero/minimo,
+blocco contiguo maggiore, stack e heartbeat del controllo. Il target temporale
+nel codice non è un numero di FPS misurato. Confrontare prove sulla stessa
+scheda, cablaggio, luminosità e numero di client Wi-Fi.
+
+Il rendering usa un proprietario dei display; il controllo ESC/RTL è
+indipendente. Questo evita il vecchio passaggio di proprietà per Pong, ma
+stabilità termica, qualità dell'alimentazione e comportamento dei driver
+richiedono comunque una prova prolungata.
+
+Le prove di interruzione alimentazione durante scritture NVS/LittleFS vanno
+eseguite su dati sacrificabili o dopo una copia dei file, separatamente dalla
+prova normale. Non risultano coperte dai test nativi. Verificare recupero della
+copia di riserva e assenza di formattazione automatica. Con partizioni diverse
+da quelle previste non presumere che il normale flash conservi i vecchi dati.
+
+Non sono verificabili qui mediante sola compilazione: montaggio reale delle
+cornici, luce nei sedici fori, soldering dei display senza pin, comportamento
+USB della specifica scheda, qualità delle immagini sui pannelli, FPS e latenza
+reali, autonomia, power-loss e funzionamento prolungato nel modello.

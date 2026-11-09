@@ -1,0 +1,4 @@
+#include "recoil/host_canvas.h"
+#include "app/storm_renderer.h"
+#include <filesystem>
+int main(int argc,char**argv){if(argc!=2)return 2;std::filesystem::create_directories(argv[1]);Storm::State s;Storm::Command cmd;HostCanvas a(160,80),b(240,135);for(int scene=0;scene<4;scene++){cmd.action=scene==0?Storm::Action::Show:scene==1?Storm::Action::Game:scene==2?Storm::Action::Pit:Storm::Action::Board;cmd.value=42;s.apply(cmd,0);for(int i=0;i<(scene<2?90:1);i++){uint32_t t=i*1000/15;if(scene==1){if(i%10==0){cmd.action=Storm::Action::Heartbeat;s.apply(cmd,t);}if(i%18==0){cmd.action=Storm::Action::Jump;s.apply(cmd,t);}}s.tick(t);StormRender::pilot(a,s.s);StormRender::navigator(b,s.s);char path[512];snprintf(path,sizeof path,"%s/%d-%03d-a.ppm",argv[1],scene,i);a.save(path);snprintf(path,sizeof path,"%s/%d-%03d-b.ppm",argv[1],scene,i);b.save(path);}}fprintf(stderr,"clipped A=%d B=%d\n",a.clipped,b.clipped);return a.clipped||b.clipped?3:0;}

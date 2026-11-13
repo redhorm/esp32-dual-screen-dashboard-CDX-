@@ -43,6 +43,15 @@ assert.equal(await page.locator('nav').count(),1);assert.equal(await page.locato
 assert.equal(await page.evaluate(()=>{const ids=[...document.querySelectorAll('[id]')].map(e=>e.id);return ids.length===new Set(ids).size}),true);
 for(const tab of ['home','trail','arcade','wow','pit']){await page.locator('[data-tab="'+tab+'"]').click();assert.equal(await page.locator('main>section:not(.hidden)').count(),1)}
 await page.waitForFunction(()=>document.querySelector('#pit-connection').textContent==='DATI AGGIORNATI');
+// Both summaries share the transport state, even with previously loaded data.
+await page.evaluate(()=>{
+  connected(false);
+  const link=document.getElementById('pit-connection');
+  if(!link.textContent.includes('CONNESSIONE PERSA')||link.classList.contains('online')||document.getElementById('pit-retryButton').hidden||!document.getElementById('pit-showButton').disabled)throw Error('Pit retained a stale online status');
+  connected(true);
+  if(link.textContent!=='DATI AGGIORNATI'||!link.classList.contains('online'))throw Error('Pit did not recover with the main connection');
+});
+
 assert.equal(await page.locator('#pit-escInverted').isChecked(),true);
 await page.locator('#pit-escForm details>summary').click();
 light.escValid=false;

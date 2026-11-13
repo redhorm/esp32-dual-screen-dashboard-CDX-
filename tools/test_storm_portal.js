@@ -101,5 +101,48 @@ test('Home is the default; shortcuts navigate without sending device commands',a
 test('Home mirrors confirmed session and display state, then clearly goes offline',async()=>{const f=await fixture();Object.assign(f.api.state,{session:true,running:true,elapsed:125000,mode:6});await f.run('poll()');assert.equal(f.$('homeTimer').textContent,'02:05');assert.match(f.$('homeSession').textContent,/corso|attiva|Sessione/);assert.match(f.$('homeDisplay').textContent,/Living/i);const last=f.$('homeTimer').textContent;f.api.fail={path:'/api/storm'};await f.run('poll()');assert.match(f.$('homeConnection').textContent,/Offline|assente|collegamento|Collega il Wi-Fi/i);assert.equal(f.$('homeTimer').textContent,last);for(const shortcut of f.elements.filter(e=>e.dataset.go))assert.equal(shortcut.disabled,false)});
 test('Returning to a selected WOW controller enables it immediately without a new poll',async()=>{const f=await fixture();await activate(f,6);await f.run("navigate('home')");const before=f.calls.length;await f.run("navigate('wow')");assert.equal(f.$('livingPad').attrs['aria-disabled'],'false');assert.equal(f.$('livingPanel').classList.contains('hidden'),false);assert.equal(f.calls.length,before)});
 
+
+test('Queue expiry removes an unsent command without reporting Wi-Fi loss',async()=>{
+  const f=await fixture();let release;
+  f.api.hold={path:'/api/storm',promise:new Promise(resolve=>{release=resolve})};
+  const held=f.run('poll()');
+  const queued=f.run("send('start')");
+  assert.equal(f.run('httpQueue.length'),1);
+  const timer=f.run('httpQueue[0].queueTimer');f.timers.get(timer).fn();
+  await queued;assert.equal(f.run('online'),true);assert.equal(f.run('busy'),false);
+  assert.match(f.$('message').textContent,/richiesta non inviata/);
+  release();await held;await f.settle();
+  assert.equal(f.calls.filter(c=>c.method==='POST').length,0);
+  assert.equal(f.run('httpQueue.length'),0);
+  f.api.hold=null;await f.run("send('start')");
+  assert.equal(f.calls.filter(c=>c.method==='POST').length,1);
+});
+test('A delayed queue timer cannot dispatch an expired request',async()=>{
+  const f=await fixture();let release;
+  f.api.hold={path:'/api/storm',promise:new Promise(resolve=>{release=resolve})};
+  const held=f.run('poll()');const queued=f.run("send('start')");
+  f.run('httpQueue[0].expires=0');release();await held;await queued;
+  assert.equal(f.calls.filter(c=>c.method==='POST').length,0);
+  assert.equal(f.run('online'),true);
+});
+test('Expiring a queued poll does not mark a healthy transport offline',async()=>{
+  const f=await fixture();let release;
+  f.api.hold={path:'/api/storm/results',promise:new Promise(resolve=>{release=resolve})};
+  const held=f.run("requestJSON('/api/storm/results')");const poll=f.run('poll()');
+  f.timers.get(f.run('httpQueue[0].queueTimer')).fn();await poll;
+  assert.equal(f.run('online'),true);assert.equal(f.run('pollTask'),null);
+  release();await held;await f.settle();
+});
+test('Dispatch clears the queue timer and preserves ordered successful requests',async()=>{
+  const f=await fixture();let release;
+  f.api.hold={path:'/api/storm/results',promise:new Promise(resolve=>{release=resolve})};
+  const held=f.run("requestJSON('/api/storm/results')");
+  const queued=f.run("requestJSON('/api/storm',{method:'POST',body:new URLSearchParams({action:'start'})})");
+  const timer=f.run('httpQueue[0].queueTimer');assert.ok(f.timers.has(timer));
+  release();await held;await queued;await f.settle();
+  assert.equal(f.timers.has(timer),false);assert.equal(f.run('httpQueue.length'),0);
+  assert.equal(f.calls.filter(c=>c.method==='POST').length,1);
+});
+
 const suiteDeadline=setTimeout(()=>{console.error('Test suite stalled');process.exit(1)},15000);
 (async()=>{let passed=0;for(const {name,fn} of tests){try{await fn();console.log('PASS '+name);passed++}catch(error){console.error('FAIL '+name);throw error}}console.log(`\n${passed}/${tests.length} portal behavior checks passed. Fixture tests only; no physical latency/FPS claims.`)})().catch(error=>{console.error(error);process.exitCode=1}).finally(()=>clearTimeout(suiteDeadline));

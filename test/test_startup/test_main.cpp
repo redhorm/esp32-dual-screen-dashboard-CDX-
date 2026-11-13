@@ -104,7 +104,7 @@ static void test_first_second_checks_all_lcd_segments_then_clears() {
     TEST_ASSERT_EQUAL_HEX16(0,actual.at(10,23));
     // Exact version banner, without claiming the Racepak unit's firmware.
     reference.fillScreen(Iq3Render::LCD);
-    RecoilRender::text(reference,"V7.1.0-RC.5-SHIFT",80,63,Iq3Render::INK);
+    RecoilRender::text(reference,"V7.1.0-RC.8-OPT",80,63,Iq3Render::INK);
     for(int y=63;y<68;++y)for(int x=50;x<110;++x)
         TEST_ASSERT_EQUAL_HEX16(reference.at(x,y),actual.at(x,y));
 }

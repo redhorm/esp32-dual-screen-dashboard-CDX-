@@ -1,0 +1,5 @@
+
+> stormdash-ui@1.0.0 test:webkit
+> STORM_WEBKIT=1 node tools/test_unified_portal.js
+
+PASS: firmware route contract, shared HTTP queue, independent ESC/lights payloads and drafts, diagnostic recovery, 404 is not Wi-Fi loss, one menu, five sections, no duplicate IDs/iframe, ESC calibration, direction preserved, settings save, error feedback, clear manual lights on exit, 320/390/1120px, legacy redirect, zero JS errors.

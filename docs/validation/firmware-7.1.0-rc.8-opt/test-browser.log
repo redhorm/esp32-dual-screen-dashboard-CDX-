@@ -1,0 +1,12 @@
+
+> stormdash-ui@1.0.0 test:browser
+> node tools/test_unified_portal.js && node tools/test_redesign.js && node tools/test_update_design.js
+
+PASS: firmware route contract, shared HTTP queue, independent ESC/lights payloads and drafts, diagnostic recovery, 404 is not Wi-Fi loss, one menu, five sections, no duplicate IDs/iframe, ESC calibration, direction preserved, settings save, error feedback, clear manual lights on exit, 320/390/1120px, legacy redirect, zero JS errors.
+PASS: 40 responsive/theme/page states, clean screenshots, theme persistence, focus visibility, accessible control names, reduced motion, Trail/Arcade/WOW/Pit interactions, ESC/lights separation, serialized HTTP, no JS errors.
+PASS: updater8viewport/theme states, native upload form+CSRF token unchanged, selected file, no JS errors. No physical upload.
+npm notice
+npm notice New major version of npm available! 11.17.0 -> 12.2.2
+npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.2
+npm notice To update run: npm install -g npm@12.2.2
+npm notice

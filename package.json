@@ -8,7 +8,8 @@
     "check:ui": "python3 tools/build_portal.py --check",
     "test": "node tools/test_storm_portal.js",
     "test:browser": "node tools/test_unified_portal.js && node tools/test_redesign.js && node tools/test_update_design.js",
-    "test:webkit": "STORM_WEBKIT=1 node tools/test_unified_portal.js"
+    "test:webkit": "STORM_WEBKIT=1 node tools/test_unified_portal.js",
+    "test:network": "python3 tools/test_network_optimizations.py"
   },
   "devDependencies": {
     "playwright": "1.64.1"

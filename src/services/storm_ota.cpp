@@ -3,6 +3,7 @@
 #include "storm_update_page.h"
 #include <Update.h>
 #include <atomic>
+#include <cstring>
 #include <esp_ota_ops.h>
 #include <esp_system.h>
 // Arduino otherwise confirms pending images inside initArduino(), before our
@@ -45,10 +46,23 @@ void begin(WebServer &s) {
            (unsigned long)esp_random(), (unsigned long)esp_random(),
            (unsigned long)esp_random(), (unsigned long)esp_random());
   s.on("/update", HTTP_GET, [&s] {
-    String page = FPSTR(STORM_UPDATE_PAGE);
-    page.replace("{{TOKEN}}", token);
+    // Stream the static page and the small per-boot token independently.
+    // Avoid allocating a second full HTML page on the ESP32 heap.
+    const char* marker = strstr(STORM_UPDATE_PAGE, "{{TOKEN}}");
     s.sendHeader("Cache-Control", "no-store");
-    s.send(200, "text/html", page);
+    if (!marker) {
+      s.send(500, "text/plain", "Pagina aggiornamento non disponibile.");
+      return;
+    }
+    const size_t prefix = size_t(marker - STORM_UPDATE_PAGE);
+    const char* suffix = marker + sizeof("{{TOKEN}}") - 1;
+    const size_t remaining = strlen(suffix);
+    const size_t tokenLength = strlen(token);
+    s.setContentLength(prefix + tokenLength + remaining);
+    s.send(200, "text/html", "");
+    s.sendContent_P(STORM_UPDATE_PAGE, prefix);
+    s.sendContent(token, tokenLength);
+    s.sendContent_P(suffix, remaining);
   });
   s.on(
       "/api/storm/update", HTTP_POST,

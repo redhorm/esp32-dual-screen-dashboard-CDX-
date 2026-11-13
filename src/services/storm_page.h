@@ -345,11 +345,25 @@ function formatTime(ms){const sec=Math.floor(ms/1000),hours=Math.floor(sec/3600)
 const httpQueue=[];let httpRunning=false;
 function pumpHttp(){
   if(httpRunning||!httpQueue.length)return;
-  const job=httpQueue.shift();httpRunning=true;
+  const job=httpQueue.shift();clearTimeout(job.queueTimer);
+  // Background tabs may defer timers: check the deadline again at dispatch.
+  if(Date.now()>=job.expires){job.reject(Object.assign(Error('queue_timeout'),{code:'queue_timeout',path:job.path}));pumpHttp();return;}
+  httpRunning=true;
   performRequest(job.path,job.options,job.timeout).then(job.resolve,job.reject).finally(()=>{httpRunning=false;pumpHttp()});
 }
 function requestJSON(path,options={},timeout=2500){
-  return new Promise((resolve,reject)=>{httpQueue.push({path,options,timeout,resolve,reject});pumpHttp()});
+  return new Promise((resolve,reject)=>{
+    const job={path,options,timeout,resolve,reject,expires:Date.now()+timeout};
+    // A command must not wait indefinitely behind another request and execute
+    // after its caller has moved on. Queue expiry means it was NEVER sent.
+    job.queueTimer=setTimeout(()=>{
+      const index=httpQueue.indexOf(job);
+      if(index<0)return;
+      httpQueue.splice(index,1);
+      reject(Object.assign(Error('queue_timeout'),{code:'queue_timeout',path}));
+    },timeout);
+    httpQueue.push(job);pumpHttp();
+  });
 }
 async function performRequest(path,options,timeoutMs){
   const controller=typeof AbortController!=='undefined'?new AbortController():null;
@@ -374,7 +388,7 @@ function controls(){
   $('card').disabled=!online&&(!historyRows||!historyRows.length);
   wowControls();
 }
-function connected(value){if(!value)haltWow(false);online=value;$('status').textContent=value?'● Online':'○ Offline';$('status').setAttribute('data-online',String(value));$('status').setAttribute('aria-label',value?'Collegato al cruscotto':'Collegamento assente');$('homeConnection').textContent=value?'Collegato al tuo cockpit':'Offline · collega il Wi-Fi stormDASH';$('networkHelp').classList.toggle('hidden',value);controls()}
+function connected(value){if(!value)haltWow(false);online=value;$('status').textContent=value?'● Online':'○ Offline';$('status').setAttribute('data-online',String(value));$('status').setAttribute('aria-label',value?'Collegato al cruscotto':'Collegamento assente');$('homeConnection').textContent=value?'Collegato al tuo cockpit':'Offline · collega il Wi-Fi stormDASH';$('networkHelp').classList.toggle('hidden',value);controls();if(window.stormPit)window.stormPit.connectionChanged()}
 function render(s){
   $('time').textContent=formatTime(s.elapsed);for(const id of ['gates','penalties','score'])$(id).textContent=s[id];
   $('trailState').textContent=s.session?(s.running?'Sessione in corso':'Sessione in pausa'):(s.elapsed||s.gates||s.penalties?'Ultima sessione chiusa':'Pronto per partire');
@@ -390,17 +404,17 @@ function render(s){
 }
 function poll(){
   if(pollTask)return pollTask;
-  pollTask=(async()=>{try{const next=await requestJSON('/api/storm');if(!validSnapshot(next))throw Error('invalid_state');state=next;connected(true);render(next);return next}catch(e){connected(false);return null}finally{pollTask=null}})();
+  pollTask=(async()=>{try{const next=await requestJSON('/api/storm');if(!validSnapshot(next))throw Error('invalid_state');state=next;connected(true);render(next);return next}catch(e){if(e.code!=='queue_timeout')connected(false);return null}finally{pollTask=null}})();
   return pollTask;
 }
-function errorMessage(error,fallback){if(error.status===400)return 'Valore non valido: controlla i campi.';if(error.status===503)return 'Cruscotto occupato: attendi un momento e verifica lo stato.';return fallback}
+function errorMessage(error,fallback){if(error.code==='queue_timeout')return 'Cruscotto occupato: richiesta non inviata. Riprova.';if(error.status===400)return 'Valore non valido: controlla i campi.';if(error.status===503)return 'Cruscotto occupato: attendi un momento e verifica lo stato.';return fallback}
 async function send(action,value){
   if(!online){msg('Ricollegati al cruscotto prima di inviare comandi.');return false}
   if(busy)return false;
   if(['exit','start','show','game','pit','board','midnight','living','liquid','garage','beat'].includes(action))haltWow(true);
   busy=true;controls();let accepted=false;
   try{await requestJSON('/api/storm',{method:'POST',body:new URLSearchParams({action,...(value===undefined?{}:{value})})});accepted=true;if(action!=='jump')msg('Comando acquisito dal cruscotto.')}
-  catch(e){if(!e.status)connected(false);msg(errorMessage(e,'Risposta non ricevuta: verifica lo stato prima di ripetere il comando.'))}
+  catch(e){if(!e.status&&e.code!=='queue_timeout')connected(false);msg(errorMessage(e,'Risposta non ricevuta: verifica lo stato prima di ripetere il comando.'))}
   finally{busy=false;controls()}
   if(accepted&&action!=='jump')await poll();return accepted;
 }
@@ -438,7 +452,7 @@ $('jump').onclick=()=>send('jump');
 document.addEventListener('visibilitychange',()=>{if(document.hidden)background();else poll()});
 window.addEventListener('pagehide',background);
 async function cycle(){
-  if(!document.hidden){await poll();if(online&&state&&((state.mode===2&&activeTab==='arcade'&&!state.paused&&!state.done)||(state.mode===5&&activeTab==='wow'&&!state.wow.paused&&!state.wow.done)||(state.mode===9&&activeTab==='wow'&&beatPlaying))&&!busy&&!document.hidden){try{await requestJSON('/api/storm',{method:'POST',body:new URLSearchParams({action:'heartbeat'})})}catch(e){if(!e.status)connected(false)}}}
+  if(!document.hidden){await poll();if(online&&state&&((state.mode===2&&activeTab==='arcade'&&!state.paused&&!state.done)||(state.mode===5&&activeTab==='wow'&&!state.wow.paused&&!state.wow.done)||(state.mode===9&&activeTab==='wow'&&beatPlaying))&&!busy&&!document.hidden){try{await requestJSON('/api/storm',{method:'POST',body:new URLSearchParams({action:'heartbeat'})})}catch(e){if(!e.status&&e.code!=='queue_timeout')connected(false)}}}
   setTimeout(cycle,800);
 }
 // One bounded, coalescing lane for phone gestures and spectral frames. Controls
@@ -487,7 +501,7 @@ async function flushControl(){
   if(!state||next.mode!==state.mode||!controlValid(next.action,next.value))return;
   controlBusy=true;const audioEpoch=beatGeneration,steerEpoch=steerGeneration;
   try{await requestJSON('/api/storm',{method:'POST',body:new URLSearchParams({action:next.action,value:next.value})})}
-  catch(e){controlPending=null;if(!e.status)connected(false);else{haltWow(false);msg(errorMessage(e,'Controllo interrotto: verifica il collegamento.'))}}
+  catch(e){controlPending=null;if(!e.status&&e.code!=='queue_timeout')connected(false);else{haltWow(false);msg(errorMessage(e,'Controllo interrotto: verifica il collegamento.'))}}
   finally{
     controlBusy=false;
     // A request accepted after Stop must be followed by silence/neutral, while
@@ -642,14 +656,15 @@ function translate(){document.documentElement.lang=language?'en':'it';root.query
 function connection(){
  const ready=settingsLoaded&&identityLoaded&&lightLoaded&&escLoaded&&telemetryLoaded&&displayLoaded;
  connected=ready&&online;
- $('connection').textContent=readIssues.size?tr('DATI PARZIALI · RIPROVA','PARTIAL DATA · RETRY'):ready?tr('DATI AGGIORNATI','DATA UP TO DATE'):tr('CARICAMENTO DATI…','LOADING DATA…');
- $('connection').className='link '+(ready&&!readIssues.size?'online':'');
- $('retryButton').hidden=ready&&!readIssues.size;
+ $('connection').textContent=!online?tr('CONNESSIONE PERSA · DATI NON AGGIORNATI','OFFLINE · DATA NOT UPDATED'):readIssues.size?tr('DATI PARZIALI · RIPROVA','PARTIAL DATA · RETRY'):ready?tr('DATI AGGIORNATI','DATA UP TO DATE'):tr('CARICAMENTO DATI…','LOADING DATA…');
+ $('connection').className='link '+(connected&&!readIssues.size?'online':'');
+ $('retryButton').hidden=connected&&!readIssues.size;
  message('globalStatus',readIssues.size?[...readIssues.values()].map(errorText).join(' · '):'',!!readIssues.size);
 }
 function errorText(e){const errors={neutral_unavailable:tr('Segnale neutro non disponibile: rilascia il gas e riprova.','Neutral signal unavailable: release throttle and retry.'),config_domain_mismatch:tr('Comando non valido per questa sezione. Ricarica la pagina.','Wrong settings section. Reload the page.'),invalid_calibration:tr('Tieni tutto gas AVANTI e riprova la lettura.','Hold full FORWARD throttle and retry the reading.'),calibration_unstable:tr('Il gas non era stabile: tienilo al massimo e riprova.','Throttle was not stable: hold it at full and retry.'),calibration_commit_failed:tr('Taratura non salvata. Rilascia il gas e riprova.','Calibration was not saved. Release throttle and retry.'),invalid_settings:tr('Valori non validi. Controlla i campi.','Invalid values. Check the fields.'),settings_commit_failed:tr('Impostazioni non salvate. Riprova.','Settings were not saved. Try again.'),profile_commit_failed:tr('Nome non salvato. Riprova.','Name was not saved. Try again.'),invalid_rtl_config:tr('Controlla luminosità e taratura PWM.','Check brightness and PWM calibration.'),rtl_commit_failed:tr('Configurazione luci non salvata.','Light configuration was not saved.'),filesystem_unavailable:tr('Archivio non disponibile. La memoria viene inizializzata solo se verificata vuota: i dati esistenti restano protetti. Controlla Hardware e diagnostica. Guida e SHOW funzionano.','Storage is unavailable. Only verified empty memory is initialized; existing data is protected. Check Hardware and diagnostics. Drive and SHOW still work.'),no_space:tr('Spazio immagini insufficiente.','Not enough image storage.'),invalid_image:tr('Immagine non supportata: usa JPG, PNG o WebP.','Unsupported image: use JPG, PNG or WebP.'),too_large:tr('Immagine troppo grande. Massimo 10 MB.','Image is too large. Maximum 10 MB.'),esc_required_for_pit:tr('Test box: abilita e collega il PWM.','Pit test: enable and connect PWM.'),esc_not_neutral:tr('Test box: il ricevitore deve essere in neutro stabile.','Pit test: the receiver must be at stable neutral.'),invalid_transaction:tr('Caricamento interrotto. Seleziona e invia di nuovo.','Upload interrupted. Select and upload again.')};if(errors[e.code])return errors[e.code];
  const names={'/api/v4/state':'Stato strumenti','/api/v3/state':'Identità','/api/esc/state':'Segnale PWM','/api/lights/state':'Luci','/api/v4/diagnostics':'Diagnostica','/api/copilot-display':'Display copilota','/api/settings':'Preferenze'};
  const name=names[e.path]||tr('Comando','Command');
+ if(e.code==='queue_timeout')return name+tr(': richiesta non inviata; cruscotto occupato. Riprova.',': request not sent; dashboard busy. Retry.');
  if(e.code==='invalid_response')return name+tr(': risposta non valida dal firmware. Riprova.',': invalid firmware response. Retry.');
  if(e.status)return name+' · HTTP '+e.status+tr('. Il cruscotto risponde; questo servizio ha restituito un errore.','. Dashboard reached; this service returned an error.');
  return name+tr(': richiesta scaduta o rete non raggiungibile. Riprova.',': request timed out or network unreachable. Retry.');}
@@ -743,7 +758,7 @@ async function initialize(){
 $('retryButton').onclick=initialize;
 document.addEventListener('visibilitychange',()=>{if(document.hidden){clearTimeout(pollTimer);clearManual();}else schedulePoll(0);});
 window.addEventListener('pagehide',()=>{clearTimeout(pollTimer);clearManual();});
-window.stormPit={instrumentLabel(){return !telemetryLoaded?'Strumenti':telemetryState.telemetrySource==='esc_pwm_scenic'?'Strumenti · ESC':'Strumenti · DEMO'},setActive(value){
+window.stormPit={connectionChanged(){connection();renderShow();},instrumentLabel(){return !telemetryLoaded?'Strumenti':telemetryState.telemetrySource==='esc_pwm_scenic'?'Strumenti · ESC':'Strumenti · DEMO'},setActive(value){
  active=value;
  if(!active){clearTimeout(pollTimer);clearManual();return;}
  if(!initialized){initialized=true;initialize();}else schedulePoll(0);

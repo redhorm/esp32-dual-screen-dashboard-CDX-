@@ -9,11 +9,25 @@ function formatTime(ms){const sec=Math.floor(ms/1000),hours=Math.floor(sec/3600)
 const httpQueue=[];let httpRunning=false;
 function pumpHttp(){
   if(httpRunning||!httpQueue.length)return;
-  const job=httpQueue.shift();httpRunning=true;
+  const job=httpQueue.shift();clearTimeout(job.queueTimer);
+  // Background tabs may defer timers: check the deadline again at dispatch.
+  if(Date.now()>=job.expires){job.reject(Object.assign(Error('queue_timeout'),{code:'queue_timeout',path:job.path}));pumpHttp();return;}
+  httpRunning=true;
   performRequest(job.path,job.options,job.timeout).then(job.resolve,job.reject).finally(()=>{httpRunning=false;pumpHttp()});
 }
 function requestJSON(path,options={},timeout=2500){
-  return new Promise((resolve,reject)=>{httpQueue.push({path,options,timeout,resolve,reject});pumpHttp()});
+  return new Promise((resolve,reject)=>{
+    const job={path,options,timeout,resolve,reject,expires:Date.now()+timeout};
+    // A command must not wait indefinitely behind another request and execute
+    // after its caller has moved on. Queue expiry means it was NEVER sent.
+    job.queueTimer=setTimeout(()=>{
+      const index=httpQueue.indexOf(job);
+      if(index<0)return;
+      httpQueue.splice(index,1);
+      reject(Object.assign(Error('queue_timeout'),{code:'queue_timeout',path}));
+    },timeout);
+    httpQueue.push(job);pumpHttp();
+  });
 }
 async function performRequest(path,options,timeoutMs){
   const controller=typeof AbortController!=='undefined'?new AbortController():null;
@@ -38,7 +52,7 @@ function controls(){
   $('card').disabled=!online&&(!historyRows||!historyRows.length);
   wowControls();
 }
-function connected(value){if(!value)haltWow(false);online=value;$('status').textContent=value?'● Online':'○ Offline';$('status').setAttribute('data-online',String(value));$('status').setAttribute('aria-label',value?'Collegato al cruscotto':'Collegamento assente');$('homeConnection').textContent=value?'Collegato al tuo cockpit':'Offline · collega il Wi-Fi stormDASH';$('networkHelp').classList.toggle('hidden',value);controls()}
+function connected(value){if(!value)haltWow(false);online=value;$('status').textContent=value?'● Online':'○ Offline';$('status').setAttribute('data-online',String(value));$('status').setAttribute('aria-label',value?'Collegato al cruscotto':'Collegamento assente');$('homeConnection').textContent=value?'Collegato al tuo cockpit':'Offline · collega il Wi-Fi stormDASH';$('networkHelp').classList.toggle('hidden',value);controls();if(window.stormPit)window.stormPit.connectionChanged()}
 function render(s){
   $('time').textContent=formatTime(s.elapsed);for(const id of ['gates','penalties','score'])$(id).textContent=s[id];
   $('trailState').textContent=s.session?(s.running?'Sessione in corso':'Sessione in pausa'):(s.elapsed||s.gates||s.penalties?'Ultima sessione chiusa':'Pronto per partire');
@@ -54,17 +68,17 @@ function render(s){
 }
 function poll(){
   if(pollTask)return pollTask;
-  pollTask=(async()=>{try{const next=await requestJSON('/api/storm');if(!validSnapshot(next))throw Error('invalid_state');state=next;connected(true);render(next);return next}catch(e){connected(false);return null}finally{pollTask=null}})();
+  pollTask=(async()=>{try{const next=await requestJSON('/api/storm');if(!validSnapshot(next))throw Error('invalid_state');state=next;connected(true);render(next);return next}catch(e){if(e.code!=='queue_timeout')connected(false);return null}finally{pollTask=null}})();
   return pollTask;
 }
-function errorMessage(error,fallback){if(error.status===400)return 'Valore non valido: controlla i campi.';if(error.status===503)return 'Cruscotto occupato: attendi un momento e verifica lo stato.';return fallback}
+function errorMessage(error,fallback){if(error.code==='queue_timeout')return 'Cruscotto occupato: richiesta non inviata. Riprova.';if(error.status===400)return 'Valore non valido: controlla i campi.';if(error.status===503)return 'Cruscotto occupato: attendi un momento e verifica lo stato.';return fallback}
 async function send(action,value){
   if(!online){msg('Ricollegati al cruscotto prima di inviare comandi.');return false}
   if(busy)return false;
   if(['exit','start','show','game','pit','board','midnight','living','liquid','garage','beat'].includes(action))haltWow(true);
   busy=true;controls();let accepted=false;
   try{await requestJSON('/api/storm',{method:'POST',body:new URLSearchParams({action,...(value===undefined?{}:{value})})});accepted=true;if(action!=='jump')msg('Comando acquisito dal cruscotto.')}
-  catch(e){if(!e.status)connected(false);msg(errorMessage(e,'Risposta non ricevuta: verifica lo stato prima di ripetere il comando.'))}
+  catch(e){if(!e.status&&e.code!=='queue_timeout')connected(false);msg(errorMessage(e,'Risposta non ricevuta: verifica lo stato prima di ripetere il comando.'))}
   finally{busy=false;controls()}
   if(accepted&&action!=='jump')await poll();return accepted;
 }
@@ -102,7 +116,7 @@ $('jump').onclick=()=>send('jump');
 document.addEventListener('visibilitychange',()=>{if(document.hidden)background();else poll()});
 window.addEventListener('pagehide',background);
 async function cycle(){
-  if(!document.hidden){await poll();if(online&&state&&((state.mode===2&&activeTab==='arcade'&&!state.paused&&!state.done)||(state.mode===5&&activeTab==='wow'&&!state.wow.paused&&!state.wow.done)||(state.mode===9&&activeTab==='wow'&&beatPlaying))&&!busy&&!document.hidden){try{await requestJSON('/api/storm',{method:'POST',body:new URLSearchParams({action:'heartbeat'})})}catch(e){if(!e.status)connected(false)}}}
+  if(!document.hidden){await poll();if(online&&state&&((state.mode===2&&activeTab==='arcade'&&!state.paused&&!state.done)||(state.mode===5&&activeTab==='wow'&&!state.wow.paused&&!state.wow.done)||(state.mode===9&&activeTab==='wow'&&beatPlaying))&&!busy&&!document.hidden){try{await requestJSON('/api/storm',{method:'POST',body:new URLSearchParams({action:'heartbeat'})})}catch(e){if(!e.status&&e.code!=='queue_timeout')connected(false)}}}
   setTimeout(cycle,800);
 }
 // One bounded, coalescing lane for phone gestures and spectral frames. Controls
@@ -151,7 +165,7 @@ async function flushControl(){
   if(!state||next.mode!==state.mode||!controlValid(next.action,next.value))return;
   controlBusy=true;const audioEpoch=beatGeneration,steerEpoch=steerGeneration;
   try{await requestJSON('/api/storm',{method:'POST',body:new URLSearchParams({action:next.action,value:next.value})})}
-  catch(e){controlPending=null;if(!e.status)connected(false);else{haltWow(false);msg(errorMessage(e,'Controllo interrotto: verifica il collegamento.'))}}
+  catch(e){controlPending=null;if(!e.status&&e.code!=='queue_timeout')connected(false);else{haltWow(false);msg(errorMessage(e,'Controllo interrotto: verifica il collegamento.'))}}
   finally{
     controlBusy=false;
     // A request accepted after Stop must be followed by silence/neutral, while

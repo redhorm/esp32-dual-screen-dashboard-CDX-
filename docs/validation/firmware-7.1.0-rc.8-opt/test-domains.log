@@ -1,0 +1,1 @@
+PASS actual C++ handlers: independent saves, cross-domain rejection, failed NVS commit rollback, PWM remains active and lights show reverse with ESC instruments disabled.

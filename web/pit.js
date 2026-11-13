@@ -15,14 +15,15 @@ function translate(){document.documentElement.lang=language?'en':'it';root.query
 function connection(){
  const ready=settingsLoaded&&identityLoaded&&lightLoaded&&escLoaded&&telemetryLoaded&&displayLoaded;
  connected=ready&&online;
- $('connection').textContent=readIssues.size?tr('DATI PARZIALI · RIPROVA','PARTIAL DATA · RETRY'):ready?tr('DATI AGGIORNATI','DATA UP TO DATE'):tr('CARICAMENTO DATI…','LOADING DATA…');
- $('connection').className='link '+(ready&&!readIssues.size?'online':'');
- $('retryButton').hidden=ready&&!readIssues.size;
+ $('connection').textContent=!online?tr('CONNESSIONE PERSA · DATI NON AGGIORNATI','OFFLINE · DATA NOT UPDATED'):readIssues.size?tr('DATI PARZIALI · RIPROVA','PARTIAL DATA · RETRY'):ready?tr('DATI AGGIORNATI','DATA UP TO DATE'):tr('CARICAMENTO DATI…','LOADING DATA…');
+ $('connection').className='link '+(connected&&!readIssues.size?'online':'');
+ $('retryButton').hidden=connected&&!readIssues.size;
  message('globalStatus',readIssues.size?[...readIssues.values()].map(errorText).join(' · '):'',!!readIssues.size);
 }
 function errorText(e){const errors={neutral_unavailable:tr('Segnale neutro non disponibile: rilascia il gas e riprova.','Neutral signal unavailable: release throttle and retry.'),config_domain_mismatch:tr('Comando non valido per questa sezione. Ricarica la pagina.','Wrong settings section. Reload the page.'),invalid_calibration:tr('Tieni tutto gas AVANTI e riprova la lettura.','Hold full FORWARD throttle and retry the reading.'),calibration_unstable:tr('Il gas non era stabile: tienilo al massimo e riprova.','Throttle was not stable: hold it at full and retry.'),calibration_commit_failed:tr('Taratura non salvata. Rilascia il gas e riprova.','Calibration was not saved. Release throttle and retry.'),invalid_settings:tr('Valori non validi. Controlla i campi.','Invalid values. Check the fields.'),settings_commit_failed:tr('Impostazioni non salvate. Riprova.','Settings were not saved. Try again.'),profile_commit_failed:tr('Nome non salvato. Riprova.','Name was not saved. Try again.'),invalid_rtl_config:tr('Controlla luminosità e taratura PWM.','Check brightness and PWM calibration.'),rtl_commit_failed:tr('Configurazione luci non salvata.','Light configuration was not saved.'),filesystem_unavailable:tr('Archivio non disponibile. La memoria viene inizializzata solo se verificata vuota: i dati esistenti restano protetti. Controlla Hardware e diagnostica. Guida e SHOW funzionano.','Storage is unavailable. Only verified empty memory is initialized; existing data is protected. Check Hardware and diagnostics. Drive and SHOW still work.'),no_space:tr('Spazio immagini insufficiente.','Not enough image storage.'),invalid_image:tr('Immagine non supportata: usa JPG, PNG o WebP.','Unsupported image: use JPG, PNG or WebP.'),too_large:tr('Immagine troppo grande. Massimo 10 MB.','Image is too large. Maximum 10 MB.'),esc_required_for_pit:tr('Test box: abilita e collega il PWM.','Pit test: enable and connect PWM.'),esc_not_neutral:tr('Test box: il ricevitore deve essere in neutro stabile.','Pit test: the receiver must be at stable neutral.'),invalid_transaction:tr('Caricamento interrotto. Seleziona e invia di nuovo.','Upload interrupted. Select and upload again.')};if(errors[e.code])return errors[e.code];
  const names={'/api/v4/state':'Stato strumenti','/api/v3/state':'Identità','/api/esc/state':'Segnale PWM','/api/lights/state':'Luci','/api/v4/diagnostics':'Diagnostica','/api/copilot-display':'Display copilota','/api/settings':'Preferenze'};
  const name=names[e.path]||tr('Comando','Command');
+ if(e.code==='queue_timeout')return name+tr(': richiesta non inviata; cruscotto occupato. Riprova.',': request not sent; dashboard busy. Retry.');
  if(e.code==='invalid_response')return name+tr(': risposta non valida dal firmware. Riprova.',': invalid firmware response. Retry.');
  if(e.status)return name+' · HTTP '+e.status+tr('. Il cruscotto risponde; questo servizio ha restituito un errore.','. Dashboard reached; this service returned an error.');
  return name+tr(': richiesta scaduta o rete non raggiungibile. Riprova.',': request timed out or network unreachable. Retry.');}
@@ -116,7 +117,7 @@ async function initialize(){
 $('retryButton').onclick=initialize;
 document.addEventListener('visibilitychange',()=>{if(document.hidden){clearTimeout(pollTimer);clearManual();}else schedulePoll(0);});
 window.addEventListener('pagehide',()=>{clearTimeout(pollTimer);clearManual();});
-window.stormPit={instrumentLabel(){return !telemetryLoaded?'Strumenti':telemetryState.telemetrySource==='esc_pwm_scenic'?'Strumenti · ESC':'Strumenti · DEMO'},setActive(value){
+window.stormPit={connectionChanged(){connection();renderShow();},instrumentLabel(){return !telemetryLoaded?'Strumenti':telemetryState.telemetrySource==='esc_pwm_scenic'?'Strumenti · ESC':'Strumenti · DEMO'},setActive(value){
  active=value;
  if(!active){clearTimeout(pollTimer);clearManual();return;}
  if(!initialized){initialized=true;initialize();}else schedulePoll(0);

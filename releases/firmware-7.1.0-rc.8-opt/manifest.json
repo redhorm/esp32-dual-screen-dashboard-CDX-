@@ -1,0 +1,21 @@
+{
+  "product": "stormDASH",
+  "version": "7.1.0-rc.8-opt",
+  "chip": "esp32s3",
+  "flash_bytes": 16777216,
+  "psram_bytes": 8388608,
+  "application_only": true,
+  "release_url": "https://github.com/redhorm/esp32-dual-screen-dashboard-CDX-/releases/tag/firmware-7.1.0-rc.8-opt",
+  "files": [
+    {
+      "file": "stormDASH-7.1.0-rc.8-opt.bin",
+      "size": 1368576,
+      "sha256": "4d15060f8f69374703287c5850bed3e8a5620727c3b7e2780ebb40e9322fe969"
+    },
+    {
+      "file": "stormDASH_7.1.0-rc.8-opt.zip",
+      "size": 7966858,
+      "sha256": "975e2bec02b54c711bef22999457dbe84696218f345e24277db1f22912340dbd"
+    }
+  ]
+}

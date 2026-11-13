@@ -660,6 +660,7 @@ void ConfigPortal::_sendSettings() {
         _settings.photo_random ? "true" : "false",
         _settings.photo_overlay ? "true" : "false",
         copilotDisplayConfig(loadCopilotDisplayProfile()).id);
+    _server.sendHeader("Cache-Control", "no-store");
     _server.send(200, "application/json", json);
 }
 
@@ -1340,51 +1341,46 @@ void ConfigPortal::_sendRtlState() {
     brightness = _rtl_brightness;
     esc_enabled = _esc_enabled;
     taskEXIT_CRITICAL(&_io_mux);
-    String json;
-    json.reserve(1100);
-    json += F("{\"ok\":true,\"profile\":\"");
-    json += RtlLogic::profileName(profile);
-    json += F("\",\"function\":\"");
-    json += RtlLogic::functionName(frame.primary);
-    json += F("\",\"brightness\":");
-    json += static_cast<unsigned>(brightness);
-    json += F(",\"hardwareReady\":");
-    json += _rtl_hw.ready() ? F("true") : F("false");
-    json += F(",\"timedOut\":");
-    json += frame.command_timed_out ? F("true") : F("false");
-    json += F(",\"escEnabled\":");
-    json += esc_enabled ? F("true") : F("false");
-    json += F(",\"pwmEnabled\":"); json += esc.enabled ? F("true") : F("false");
-    json += F(",\"lightsFollowPwm\":true");
-    json += F(",\"escValid\":");
-    json += esc.valid ? F("true") : F("false");
-    json += F(",\"escPulse\":");
-    json += esc.filtered_us;
-    json += F(",\"escFullForwardUs\":"); json += full_forward;
-    json += F(",\"escFullForwardCalibrated\":"); json += EscDisplayCalibration::valid(esc_config, full_forward) ? F("true") : F("false");
-    json += F(",\"escRawPulse\":"); json += esc.pulse_us;
-    json += F(",\"escAgeMs\":"); json += esc.age_ms;
-    json += F(",\"escInverted\":"); json += esc_config.inverted ? F("true") : F("false");
-    json += F(",\"escType\":\"");
-    json += EscSignalProcessor::typeName(esc_config.type);
-    json += F("\",\"escState\":\"");
-    json += EscSignalProcessor::stateName(esc.state);
-    json += F("\",\"escNormalized\":");
-    json += static_cast<int>(esc.normalized * 100.0f);
-    json += F(",\"escNeutralUs\":"); json += esc_config.neutral_us;
-    json += F(",\"escDeadbandUs\":"); json += deadband_us;
-    json += F(",\"escReverseConfirmMs\":"); json += esc_config.reverse_confirm_ms;
-    json += F(",\"pixels\":[");
-    for (uint16_t i = 0; i < frame.count; ++i) {
-        if (i) json += ',';
-        json += '['; json += static_cast<unsigned>(frame.pixels[i].r); json += ',';
-        json += static_cast<unsigned>(frame.pixels[i].g); json += ',';
-        json += static_cast<unsigned>(frame.pixels[i].b);
-        json += ']';
+    // Reuse the portal's fixed buffer instead of repeatedly growing a String.
+    // This handler runs only on the single HTTP service task.
+    size_t used = 0;
+    const char* yes = "true";
+    const char* no = "false";
+    bool ok = frame.count <= RTL_LOGIC_MAX_PIXELS &&
+        appendFormat(_json_buffer, sizeof(_json_buffer), used,
+            "{\"ok\":true,\"profile\":\"%s\",\"function\":\"%s\","
+            "\"brightness\":%u,\"hardwareReady\":%s,\"timedOut\":%s,"
+            "\"escEnabled\":%s,\"pwmEnabled\":%s,\"lightsFollowPwm\":true,"
+            "\"escValid\":%s,\"escPulse\":%u,\"escFullForwardUs\":%u,"
+            "\"escFullForwardCalibrated\":%s,\"escRawPulse\":%u,\"escAgeMs\":%lu,"
+            "\"escInverted\":%s,\"escType\":\"%s\",\"escState\":\"%s\","
+            "\"escNormalized\":%d,\"escNeutralUs\":%u,\"escDeadbandUs\":%u,"
+            "\"escReverseConfirmMs\":%u,\"pixels\":[",
+            RtlLogic::profileName(profile), RtlLogic::functionName(frame.primary),
+            unsigned(brightness), _rtl_hw.ready() ? yes : no,
+            frame.command_timed_out ? yes : no, esc_enabled ? yes : no,
+            esc.enabled ? yes : no, esc.valid ? yes : no,
+            unsigned(esc.filtered_us), unsigned(full_forward),
+            EscDisplayCalibration::valid(esc_config, full_forward) ? yes : no,
+            unsigned(esc.pulse_us), static_cast<unsigned long>(esc.age_ms),
+            esc_config.inverted ? yes : no,
+            EscSignalProcessor::typeName(esc_config.type),
+            EscSignalProcessor::stateName(esc.state),
+            static_cast<int>(esc.normalized * 100.0f),
+            unsigned(esc_config.neutral_us), unsigned(deadband_us),
+            unsigned(esc_config.reverse_confirm_ms));
+    for (uint16_t i = 0; ok && i < frame.count; ++i) {
+        ok = appendFormat(_json_buffer, sizeof(_json_buffer), used,
+            "%s[%u,%u,%u]", i ? "," : "", unsigned(frame.pixels[i].r),
+            unsigned(frame.pixels[i].g), unsigned(frame.pixels[i].b));
     }
-    json += F("]}");
+    ok = ok && appendFormat(_json_buffer, sizeof(_json_buffer), used, "]}");
     _server.sendHeader("Cache-Control", "no-store");
-    _server.send(200, "application/json", json);
+    if (!ok) {
+        _server.send(500, "application/json", "{\"ok\":false,\"error\":\"state_overflow\"}");
+        return;
+    }
+    _server.send_P(200, "application/json", _json_buffer, used);
 }
 
 void ConfigPortal::_calibrateForward() {

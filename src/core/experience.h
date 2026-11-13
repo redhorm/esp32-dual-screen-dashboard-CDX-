@@ -5,7 +5,7 @@
 #include "task_guard.h"
 #include "race.h"
 
-constexpr const char* EXPERIENCE_VERSION = "7.1.0-rc.7-esc-lights";
+constexpr const char* EXPERIENCE_VERSION = "7.1.0-rc.8-opt";
 
 // Vehicle identity remains wire-compatible with the previous beta. The two
 // legacy counters remain reserved so persisted configuration is not lost.

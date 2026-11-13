@@ -26,6 +26,7 @@ def art(match):
     return svg
 html=html.replace('<!-- PIT_CONTROLS -->',(ROOT/'web/pit.html').read_text()).replace('/* PIT_SCRIPT */',(ROOT/'web/pit.js').read_text())
 html=html.replace('/* PRESENTATION_SCRIPT */',(ROOT/'web/presentation.js').read_text())
+html=html.replace('/* ENGINE_SYNTH */',(ROOT/'web/engine_synth.js').read_text()).replace('/* ENGINE_AUDIO */',(ROOT/'web/engine_audio.js').read_text())
 html=re.sub(r'<!-- ART:([a-z-]+) -->',art,html)
 html=html.replace('/* INLINE_STYLE */',css).replace('/* INLINE_SCRIPT */',js)
 assert 'INLINE_' not in html and '<!-- ART:' not in html

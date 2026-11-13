@@ -1,0 +1,15 @@
+{
+  "version": "7.1.0-rc.9-audio",
+  "bytes": 1383760,
+  "sha256": "eb676ee952b873ec28a296e8627b6a3e5a3bacafcf06465cb59a3d86fd9e2f4b",
+  "slot": "app1",
+  "offset": "0x800000",
+  "hash_verified": true,
+  "partitions_preserved": [
+    "nvs",
+    "otadata",
+    "littlefs",
+    "stormdata",
+    "app0"
+  ]
+}

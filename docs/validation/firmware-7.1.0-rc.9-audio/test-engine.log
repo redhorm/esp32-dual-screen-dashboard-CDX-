@@ -1,0 +1,35 @@
+
+> stormdash-ui@1.0.0 test:engine
+> node tools/test_engine_synth.js && node tools/test_engine_audio.js
+
+PASS actual OfflineAudioContext: idle/acceleration frequency, startup, clipping headroom, gear cut/recovery, reverse, top-gear limiter, stale-data silence, mute and stop. No physical audio playback.
+{
+  "silence": 0,
+  "idle": 0.132014573406458,
+  "high": 0.16193563030199323,
+  "maxPeak": 0.3389063775539398,
+  "idleFundamental": 0.0058246019142727855,
+  "idleWrongPitch": 2.1343994742263363e-7,
+  "highFundamental": 0.0091375621805527,
+  "highWrongPitch": 7.733950664288212e-7,
+  "shiftCut": 0.052094055013037,
+  "steadyCutWindow": 0.15154435476877842,
+  "reverseCutWindow": 0.15154435476877842,
+  "limiter": 0.11691023535400176,
+  "unlimited": 0.16846359225230007,
+  "staleTail": 0,
+  "stopTail": 0,
+  "muteTail": 0,
+  "recoveredShift": 0.15116745412685928,
+  "steadyAfterShift": 0.15116745424593517
+}
+PASS No autoplay; explicit gesture starts engine; RPM, reverse, volume and stop are read-only
+PASS Invalid, absent or demo telemetry stops sound and cannot auto-restart
+PASS Frozen timestamps, invalid JSON and network failure terminate playback
+PASS Tab exit, page hiding and changing instrument mode release audio
+PASS Stop during deferred browser resume cannot resurrect the old audio session
+PASS Stop during pending telemetry discards late data and permits a deliberate restart
+PASS Pending transport times out without leaving audio or replaying old data
+PASS A blocked shared HTTP lane expires audio reads without replay after release
+PASS Unavailable or rejected browser audio reports an actionable stopped state
+9 engine audio integration groups passed; HTTP/Web Audio fixtures only, no receiver or motor commands.

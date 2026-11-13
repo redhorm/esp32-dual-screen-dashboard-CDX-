@@ -1,0 +1,11 @@
+{
+  "version": "7.1.0-rc.9-audio",
+  "chip": "esp32s3",
+  "module": "N16R8",
+  "artifact": "stormDASH-7.1.0-rc.9-audio.bin",
+  "kind": "application-only",
+  "size": 1383760,
+  "sha256": "eb676ee952b873ec28a296e8627b6a3e5a3bacafcf06465cb59a3d86fd9e2f4b",
+  "installation": "OTA through existing dashboard /update",
+  "tests": "docs/validation/firmware-7.1.0-rc.9-audio"
+}

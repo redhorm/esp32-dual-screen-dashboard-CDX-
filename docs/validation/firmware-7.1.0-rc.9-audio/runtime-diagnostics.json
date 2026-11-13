@@ -1,0 +1,68 @@
+{
+  "ok": true,
+  "firmware": "7.1.0-rc.9-audio",
+  "protocol": 4,
+  "uptimeMs": 47559,
+  "displayA": {
+    "ok": true,
+    "heartbeatAgeMs": 37,
+    "stackFreeBytes": 4432,
+    "fps": 29,
+    "frames": 1296,
+    "frameAvgUs": 7532,
+    "frameMaxUs": 17851,
+    "renderAvgUs": 2263,
+    "renderMaxUs": 11885,
+    "pushAvgUs": 5269,
+    "pushMaxUs": 6043
+  },
+  "displayB": {
+    "ok": true,
+    "heartbeatAgeMs": 37,
+    "stackFreeBytes": 4432,
+    "fps": 14,
+    "frames": 731,
+    "frameAvgUs": 11537,
+    "frameMaxUs": 24323,
+    "renderAvgUs": 4923,
+    "renderMaxUs": 17678,
+    "pushAvgUs": 6614,
+    "pushMaxUs": 6673
+  },
+  "memory": {
+    "heapFreeBytes": 146056,
+    "heapMinBytes": 132032,
+    "heapLargestBytes": 126964,
+    "psramPresent": true,
+    "psramFreeBytes": 8366483,
+    "psramTotalBytes": 8385847
+  },
+  "storage": {
+    "ready": true,
+    "totalBytes": 5177344,
+    "usedBytes": 86016,
+    "freeBytes": 5091328,
+    "systemAssetBytes": 0,
+    "userPhotoBytes": 69238,
+    "transactionBytes": 0
+  },
+  "wifi": {
+    "online": true,
+    "clients": 0
+  },
+  "rtl": {
+    "ok": true,
+    "controlAlive": true,
+    "controlAgeMs": 5,
+    "controlStackFreeBytes": 2944
+  },
+  "esc": {
+    "enabled": true,
+    "valid": false,
+    "pulseUs": 0
+  },
+  "lastError": "",
+  "restartCount": 35,
+  "resetReason": "unknown",
+  "resetReasonCode": 0
+}

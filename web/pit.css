@@ -137,3 +137,12 @@
   #pitControls input[type='checkbox'] { appearance: auto; -webkit-appearance: auto; }
   #pitControls input[type='checkbox']::after { display: none; }
 }
+/* Engine sound: phone-only controls using portal tokens. */
+#pitControls .engine-card h2 { font-size:clamp(28px,4vw,42px); margin-top:18px; }
+#pitControls .engine-card .row { flex-wrap:wrap; }
+#pitControls .engine-card .eyebrow { margin-bottom:0; }
+#pitControls .engine-meter { height:6px; margin:22px 0; background:var(--line); overflow:hidden; border-radius:3px; }
+#pitControls .engine-meter i { display:block; height:100%; background:var(--accent); transform-origin:left; transform:scaleX(var(--engine-level,0)); transition:transform .15s linear; }
+#pitControls .engine-running .pill { border-color:var(--accent); color:var(--accent); }
+#pitControls .engine-card .status { margin-top:16px; }
+@media(prefers-reduced-motion:reduce){#pitControls .engine-meter i { transition:none; }}

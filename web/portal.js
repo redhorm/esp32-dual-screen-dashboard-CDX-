@@ -51,6 +51,7 @@ function controls(){
   $('jump').disabled=!online||busy||!state||state.mode!==2||state.done;
   $('card').disabled=!online&&(!historyRows||!historyRows.length);
   wowControls();
+  if(window.stormEngineAudio)window.stormEngineAudio.sync();
 }
 function connected(value){if(!value)haltWow(false);online=value;$('status').textContent=value?'● Online':'○ Offline';$('status').setAttribute('data-online',String(value));$('status').setAttribute('aria-label',value?'Collegato al cruscotto':'Collegamento assente');$('homeConnection').textContent=value?'Collegato al tuo cockpit':'Offline · collega il Wi-Fi stormDASH';$('networkHelp').classList.toggle('hidden',value);controls();if(window.stormPit)window.stormPit.connectionChanged()}
 function render(s){
@@ -76,6 +77,7 @@ async function send(action,value){
   if(!online){msg('Ricollegati al cruscotto prima di inviare comandi.');return false}
   if(busy)return false;
   if(['exit','start','show','game','pit','board','midnight','living','liquid','garage','beat'].includes(action))haltWow(true);
+  if(window.stormEngineAudio&&['exit','start','show','game','pit','board','midnight','living','liquid','garage','beat'].includes(action))window.stormEngineAudio.stop('mode');
   busy=true;controls();let accepted=false;
   try{await requestJSON('/api/storm',{method:'POST',body:new URLSearchParams({action,...(value===undefined?{}:{value})})});accepted=true;if(action!=='jump')msg('Comando acquisito dal cruscotto.')}
   catch(e){if(!e.status&&e.code!=='queue_timeout')connected(false);msg(errorMessage(e,'Risposta non ricevuta: verifica lo stato prima di ripetere il comando.'))}
@@ -93,7 +95,7 @@ function background(){
 function navigate(tab){
   if(!['home','trail','arcade','wow','pit'].includes(tab))return;
   if((activeTab==='arcade'||activeTab==='wow')&&tab!==activeTab)background();
-  activeTab=tab;all('section').forEach(s=>s.classList.toggle('hidden',s.id!==activeTab));
+  activeTab=tab;if(window.stormEngineAudio)window.stormEngineAudio.sync();all('section').forEach(s=>s.classList.toggle('hidden',s.id!==activeTab));
   all('[data-tab]').forEach(b=>{const selected=b.dataset.tab===tab;b.classList.toggle('active',selected);b.setAttribute('aria-pressed',String(selected));b.setAttribute('aria-current',selected?'page':'false')});
   $('appMain').setAttribute('data-page',tab);
   if(window.stormPit)window.stormPit.setActive(activeTab==='pit');

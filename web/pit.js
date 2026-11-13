@@ -11,7 +11,7 @@ let manual='clear',mutationBusy=false,pollBusy=false,pollTimer=0,lastSlow=0,conn
 const readIssues=new Map();
 const tr=(it,en)=>language?en:it;
 function message(id,text,error=false){const e=$(id);e.textContent=text;e.className='status '+(error?'error':'ok');}
-function translate(){document.documentElement.lang=language?'en':'it';root.querySelectorAll('[data-it]').forEach(e=>{const value=language?e.dataset.en:e.dataset.it;if(e.hasAttribute('data-html'))e.innerHTML=value;else e.textContent=value;});root.querySelectorAll('[data-label-it]').forEach(e=>e.setAttribute('aria-label',language?e.dataset.labelEn:e.dataset.labelIt));renderShow();renderLights();renderTelemetry();}
+function translate(){document.documentElement.lang=language?'en':'it';root.querySelectorAll('[data-it]').forEach(e=>{const value=language?e.dataset.en:e.dataset.it;if(e.hasAttribute('data-html'))e.innerHTML=value;else e.textContent=value;});root.querySelectorAll('[data-label-it]').forEach(e=>e.setAttribute('aria-label',language?e.dataset.labelEn:e.dataset.labelIt));renderShow();renderLights();renderTelemetry();if(window.stormEngineAudio)window.stormEngineAudio.sync();}
 function connection(){
  const ready=settingsLoaded&&identityLoaded&&lightLoaded&&escLoaded&&telemetryLoaded&&displayLoaded;
  connected=ready&&online;
@@ -74,7 +74,7 @@ async function poll(){
  }finally{pollBusy=false;connection();renderShow();schedulePoll(showState.active||manual!=='clear'?500:1100)}
 }
 function clearManual(){const had=manual!=='clear';manual='clear';renderLights();if(had){const data=new URLSearchParams({function:'clear'});if(document.hidden&&navigator.sendBeacon)navigator.sendBeacon('/api/lights/command',data);else request('/api/lights/command',{function:'clear'},1200).catch(()=>{});}}
-$('showButton').onclick=()=>action($('showButton'),'showStatus',async()=>{const active=showState.pending?showState.requestedActive:showState.active;showState=await request('/api/show',{action:active?'stop':'start'});message('showStatus',active?tr('Ritorno alla guida.','Returning to drive.'):tr('SHOW avviato. Guarda i due display.','SHOW started. Watch both displays.'));renderShow();});
+$('showButton').onclick=()=>{if(window.stormEngineAudio)window.stormEngineAudio.stop('mode');return action($('showButton'),'showStatus',async()=>{const active=showState.pending?showState.requestedActive:showState.active;showState=await request('/api/show',{action:active?'stop':'start'});message('showStatus',active?tr('Ritorno alla guida.','Returning to drive.'):tr('SHOW avviato. Guarda i due display.','SHOW started. Watch both displays.'));renderShow();});};
 $('identityForm').onsubmit=e=>{e.preventDefault();const f=e.currentTarget;action(f.querySelector('button'),'identityStatus',async()=>{await request('/api/v3/profile',formValues(f));identityLoaded=false;await loadIdentity();message('identityStatus',tr('Nome salvato.','Name saved.'));});};
 $('displayForm').onsubmit=e=>{e.preventDefault();const f=e.currentTarget;action(f.querySelector('button'),'displayStatus',async()=>{await request('/api/settings',formValues(f));language=Number(f.elements.language.value)===1?1:0;translate();message('displayStatus',tr('Display aggiornati.','Displays updated.'));});};
 $('escForm').elements.escType.onchange=renderEscFields;

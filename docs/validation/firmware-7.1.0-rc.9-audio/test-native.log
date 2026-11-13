@@ -1,0 +1,316 @@
+Verbosity level can be increased via `-v, -vv, or -vvv` option
+Collected 18 tests
+
+Processing test_config_integrity in native environment
+--------------------------------------------------------------------------------
+Building...
+Testing...
+test/test_config_integrity/test_main.cpp:150: test_crc32_standard_vector	[PASSED]
+test/test_config_integrity/test_main.cpp:151: test_record_round_trip_and_corruption_detection	[PASSED]
+test/test_config_integrity/test_main.cpp:152: test_wrong_magic_schema_size_and_truncation	[PASSED]
+test/test_config_integrity/test_main.cpp:153: test_newest_valid_slot_selection	[PASSED]
+test/test_config_integrity/test_main.cpp:154: test_sequence_and_slot_selection_survive_wrap	[PASSED]
+test/test_config_integrity/test_main.cpp:155: test_migration_decisions	[PASSED]
+----------- native:test_config_integrity [PASSED] Took 3.55 seconds -----------
+
+Processing test_instruments_pilot in native environment
+--------------------------------------------------------------------------------
+Building...
+Testing...
+test/test_instruments_pilot/test_main.cpp:105: test_pair_lamps_are_symmetric_and_keep_every_cad_aperture	[PASSED]
+test/test_instruments_pilot/test_main.cpp:106: test_rpm_drives_tach_and_pairs_without_moving_instrument_labels	[PASSED]
+test/test_instruments_pilot/test_main.cpp:107: test_central_gear_changes_and_side_units_are_visible	[PASSED]
+test/test_instruments_pilot/test_main.cpp:108: test_extremes_startup_finish_and_warnings_keep_demo_and_mask	[PASSED]
+test/test_instruments_pilot/test_main.cpp:109: test_alignment_remains_byte_identical_to_delivered_calibration	[PASSED]
+----------- native:test_instruments_pilot [PASSED] Took 0.81 seconds -----------
+
+Processing test_wow in native environment
+--------------------------------------------------------------------------------
+Building...
+Testing...
+test/test_wow/test_main.cpp:365: entry_resets_modes_and_preserves_best	[PASSED]
+test/test_wow/test_main.cpp:366: midnight_seeded_replay_and_course_variation	[PASSED]
+test/test_wow/test_main.cpp:367: midnight_collision_changes_result_and_finish_is_frozen	[PASSED]
+test/test_wow/test_main.cpp:368: midnight_controller_timeout_and_foreground_resume	[PASSED]
+test/test_wow/test_main.cpp:369: midnight_steering_expires_even_while_heartbeat_is_alive	[PASSED]
+test/test_wow/test_main.cpp:370: midnight_boot_pause_and_explicit_resume	[PASSED]
+test/test_wow/test_main.cpp:371: fixed_step_discards_backlog_and_preserves_substeps	[PASSED]
+test/test_wow/test_main.cpp:372: automatic_heartbeat_cannot_cancel_manual_or_background_pause	[PASSED]
+test/test_wow/test_main.cpp:373: clock_wrap_matches_normal_time	[PASSED]
+test/test_wow/test_main.cpp:374: living_gaze_blink_and_expiring_event_memory	[PASSED]
+test/test_wow/test_main.cpp:375: liquid_drag_and_impulse_change_bounded_motion	[PASSED]
+test/test_wow/test_main.cpp:376: liquid_is_deterministic_for_same_input	[PASSED]
+test/test_wow/test_main.cpp:377: garage_explodes_reassembles_and_orbits	[PASSED]
+test/test_wow/test_main.cpp:378: beat_band_order_expiry_decay_and_background	[PASSED]
+test/test_wow/test_main.cpp:379: beat_silence_palette_and_clock_wrap	[PASSED]
+test/test_wow/test_main.cpp:380: controls_ignore_incompatible_modes_and_invalid_ranges	[PASSED]
+------------------ native:test_wow [PASSED] Took 0.61 seconds ------------------
+
+Processing test_recoil in native environment
+--------------------------------------------------------------------------------
+Building...
+Testing...
+test/test_recoil/test_main.cpp:81: test_every_aperture_matches_even_with_alert_and_three_digit_speed	[PASSED]
+test/test_recoil/test_main.cpp:82: test_calibration_boot_and_finish_keep_aperture_centres	[PASSED]
+test/test_recoil/test_main.cpp:83: test_masked_area_stays_black_except_light_patches	[PASSED]
+test/test_recoil/test_main.cpp:84: test_native_navigation_states_and_profile_rejection	[PASSED]
+test/test_recoil/test_main.cpp:85: test_theme_ids_preserve_old_settings_and_reserve_pro_race	[PASSED]
+test/test_recoil/test_main.cpp:86: test_sixteen_light_quantizer_reaches_both_ends_without_skips	[PASSED]
+---------------- native:test_recoil [PASSED] Took 0.74 seconds ----------------
+
+Processing test_instruments_nav in native environment
+--------------------------------------------------------------------------------
+Building...
+Testing...
+test/test_instruments_nav/test_main.cpp:77: test_route_matches_roadbook_distances_and_turns	[PASSED]
+test/test_instruments_nav/test_main.cpp:78: test_waypoint_crossings_are_continuous_and_dtw_resets_to_next_leg	[PASSED]
+test/test_instruments_nav/test_main.cpp:79: test_finish_and_bad_inputs_are_finite_and_bounded	[PASSED]
+test/test_instruments_nav/test_main.cpp:80: test_chart_pan_and_scale_are_metric_and_north_up	[PASSED]
+test/test_instruments_nav/test_main.cpp:81: test_full_stage_render_is_clipped_and_finish_is_stationary	[PASSED]
+------------ native:test_instruments_nav [PASSED] Took 0.75 seconds ------------
+
+Processing test_esc_logic in native environment
+--------------------------------------------------------------------------------
+Building...
+Testing...
+test/test_esc_logic/test_main.cpp:279: test_esc_normalization_and_neutral_hysteresis	[PASSED]
+test/test_esc_logic/test_main.cpp:280: test_race_esc_requires_brake_release_and_reverse_confirmation	[PASSED]
+test/test_esc_logic/test_main.cpp:281: test_invalid_esc_signal_fails_neutral	[PASSED]
+test/test_esc_logic/test_main.cpp:282: test_asymmetric_calibration_keeps_equal_microsecond_deadband	[PASSED]
+test/test_esc_logic/test_main.cpp:283: test_deadband_extremes_match_configured_microseconds	[PASSED]
+test/test_esc_logic/test_main.cpp:284: test_crawler_changes_direction_immediately_without_fake_braking	[PASSED]
+test/test_esc_logic/test_main.cpp:285: test_inverted_crawler_keeps_asymmetric_neutral_band	[PASSED]
+test/test_esc_logic/test_main.cpp:286: test_median_rejects_spike_but_step_has_one_pulse_delay	[PASSED]
+test/test_esc_logic/test_main.cpp:287: test_esc_state_machine_timers_survive_millis_wrap	[PASSED]
+test/test_esc_logic/test_main.cpp:288: test_rtl_maps_braking_and_reverse_to_distinct_zones	[PASSED]
+test/test_esc_logic/test_main.cpp:289: test_shift_lights_ignore_boundary_jitter	[PASSED]
+test/test_esc_logic/test_main.cpp:290: test_shift_lights_rate_limit_large_steps	[PASSED]
+--------------- native:test_esc_logic [PASSED] Took 0.48 seconds ---------------
+
+Processing test_storage_boot in native environment
+--------------------------------------------------------------------------------
+Building...
+Testing...
+test/test_storage_boot/test_main.cpp:90: test_complete_real_partition_required_before_initialization	[PASSED]
+test/test_storage_boot/test_main.cpp:91: test_one_programmed_byte_anywhere_preserves_partition	[PASSED]
+test/test_storage_boot/test_main.cpp:92: test_failed_read_never_authorizes_initialization	[PASSED]
+test/test_storage_boot/test_main.cpp:93: test_ineligible_or_empty_partition_is_not_read_or_initialized	[PASSED]
+test/test_storage_boot/test_main.cpp:94: test_partial_last_chunk_is_read_exactly_without_rounding	[PASSED]
+------------- native:test_storage_boot [PASSED] Took 0.71 seconds -------------
+
+Processing test_core in native environment
+--------------------------------------------------------------------------------
+Building...
+Testing...
+test/test_core/test_main.cpp:847: test_roadbook_initial_state	[PASSED]
+test/test_core/test_main.cpp:848: test_roadbook_advances_waypoint	[PASSED]
+test/test_core/test_main.cpp:849: test_roadbook_skips_multiple_waypoints	[PASSED]
+test/test_core/test_main.cpp:850: test_roadbook_finish_detection	[PASSED]
+test/test_core/test_main.cpp:851: test_roadbook_reset	[PASSED]
+test/test_core/test_main.cpp:852: test_roadbook_stage_data_consistency	[PASSED]
+test/test_core/test_main.cpp:854: test_sim_reset_defaults	[PASSED]
+test/test_core/test_main.cpp:855: test_sim_zero_dt_is_noop	[PASSED]
+test/test_core/test_main.cpp:856: test_sim_accelerates_from_standstill	[PASSED]
+test/test_core/test_main.cpp:857: test_sim_gears_follow_speed	[PASSED]
+test/test_core/test_main.cpp:858: test_sim_values_stay_in_bounds	[PASSED]
+test/test_core/test_main.cpp:859: test_sim_coasting_keeps_engine_coupled_to_road_speed	[PASSED]
+test/test_core/test_main.cpp:860: test_sim_odometer_advances	[PASSED]
+test/test_core/test_main.cpp:861: test_sim_dt_clamp	[PASSED]
+test/test_core/test_main.cpp:863: test_sim_gear_no_chatter_at_steady_speed	[PASSED]
+test/test_core/test_main.cpp:864: test_sim_shift_cooldown_spacing	[PASSED]
+test/test_core/test_main.cpp:865: test_sim_hits_rev_limiter_before_shifts	[PASSED]
+test/test_core/test_main.cpp:867: test_driver_brakes_into_danger_waypoint	[PASSED]
+test/test_core/test_main.cpp:868: test_driver_accelerates_on_straight	[PASSED]
+test/test_core/test_main.cpp:869: test_driver_holds_corner_speed_at_apex	[PASSED]
+test/test_core/test_main.cpp:870: test_driver_corner_speed_mapping	[PASSED]
+test/test_core/test_main.cpp:872: test_race_boot_then_live	[PASSED]
+test/test_core/test_main.cpp:873: test_external_startup_does_not_advance_demo_trip	[PASSED]
+test/test_core/test_main.cpp:874: test_race_full_lap_finish_and_restart	[PASSED]
+test/test_core/test_main.cpp:875: test_race_alert_near_danger_waypoint	[PASSED]
+test/test_core/test_main.cpp:876: test_race_gear_snap_progress	[PASSED]
+test/test_core/test_main.cpp:878: test_anim_progress	[PASSED]
+test/test_core/test_main.cpp:879: test_anim_pulse	[PASSED]
+test/test_core/test_main.cpp:880: test_anim_triangle_and_snap	[PASSED]
+test/test_core/test_main.cpp:881: test_anim_lerp565	[PASSED]
+test/test_core/test_main.cpp:883: test_ease_curves	[PASSED]
+test/test_core/test_main.cpp:884: test_follow_attack_release_asymmetry	[PASSED]
+test/test_core/test_main.cpp:885: test_follow_first_update_snaps	[PASSED]
+test/test_core/test_main.cpp:886: test_slide_anim	[PASSED]
+test/test_core/test_main.cpp:888: test_noise_deterministic_and_bounded	[PASSED]
+test/test_core/test_main.cpp:889: test_noise_vib_bounded	[PASSED]
+test/test_core/test_main.cpp:890: test_sim_rpm_jitter_alive_but_bounded	[PASSED]
+test/test_core/test_main.cpp:891: test_sim_battery_sags_and_recovers	[PASSED]
+test/test_core/test_main.cpp:892: test_sim_thermal_inertia_asymmetric	[PASSED]
+test/test_core/test_main.cpp:894: test_sim_esc_heats_faster_than_motor	[PASSED]
+test/test_core/test_main.cpp:895: test_fmt_temp_plain	[PASSED]
+test/test_core/test_main.cpp:897: test_compass_north_centered	[PASSED]
+test/test_core/test_main.cpp:898: test_compass_wraparound	[PASSED]
+test/test_core/test_main.cpp:899: test_compass_tick_spacing	[PASSED]
+test/test_core/test_main.cpp:901: test_race_alert_in_out_timing	[PASSED]
+test/test_core/test_main.cpp:903: test_fmt_speed	[PASSED]
+test/test_core/test_main.cpp:904: test_fmt_battery	[PASSED]
+test/test_core/test_main.cpp:905: test_fmt_temp	[PASSED]
+test/test_core/test_main.cpp:906: test_fmt_heading	[PASSED]
+test/test_core/test_main.cpp:907: test_fmt_dist	[PASSED]
+test/test_core/test_main.cpp:908: test_fmt_gear	[PASSED]
+test/test_core/test_main.cpp:909: test_fmt_percent	[PASSED]
+test/test_core/test_main.cpp:910: test_fmt_clock	[PASSED]
+test/test_core/test_main.cpp:911: test_fmt_race_time	[PASSED]
+test/test_core/test_main.cpp:912: test_ui_theme_sanitization	[PASSED]
+test/test_core/test_main.cpp:913: test_ui_numeric_clamps	[PASSED]
+test/test_core/test_main.cpp:914: test_rtl_profiles_priority_and_timeout	[PASSED]
+test/test_core/test_main.cpp:915: test_rtl_count_clamp_and_wrap_keepalive	[PASSED]
+----------------- native:test_core [PASSED] Took 0.62 seconds -----------------
+
+Processing test_ui_settings in native environment
+--------------------------------------------------------------------------------
+Building...
+Testing...
+test/test_ui_settings/test_main.cpp:123: test_theme_ids_remain_backward_compatible	[PASSED]
+test/test_ui_settings/test_main.cpp:124: test_language_sanitization_and_names	[PASSED]
+test/test_ui_settings/test_main.cpp:125: test_display_translation_is_ascii_and_deterministic	[PASSED]
+test/test_ui_settings/test_main.cpp:126: test_ui_settings_stays_shared_frame_safe	[PASSED]
+test/test_ui_settings/test_main.cpp:127: test_copilot_layout_stays_inside_native_viewport	[PASSED]
+test/test_ui_settings/test_main.cpp:128: test_copilot_profiles_have_native_geometry_and_safe_fallback	[PASSED]
+test/test_ui_settings/test_main.cpp:129: test_profile_layout_table_matches_native_panels	[PASSED]
+-------------- native:test_ui_settings [PASSED] Took 3.35 seconds --------------
+
+Processing test_esc_dashboard in native environment
+--------------------------------------------------------------------------------
+Building...
+Testing...
+test/test_esc_dashboard/test_main.cpp:199: test_neutral_is_stationary_without_demo	[PASSED]
+test/test_esc_dashboard/test_main.cpp:200: test_forward_command_controls_speed_and_rpm	[PASSED]
+test/test_esc_dashboard/test_main.cpp:201: test_all_forward_gears_show_rpm_drop_and_limiter	[PASSED]
+test/test_esc_dashboard/test_main.cpp:202: test_partial_throttle_does_not_run_away_or_hunt_gears	[PASSED]
+test/test_esc_dashboard/test_main.cpp:203: test_release_goes_to_rest_on_next_frame	[PASSED]
+test/test_esc_dashboard/test_main.cpp:204: test_signal_loss_is_immediate_and_recovery_ramps	[PASSED]
+test/test_esc_dashboard/test_main.cpp:205: test_disabled_source_clears_history	[PASSED]
+test/test_esc_dashboard/test_main.cpp:206: test_reverse_requires_explicit_permission	[PASSED]
+test/test_esc_dashboard/test_main.cpp:207: test_braking_decelerates_without_entering_reverse	[PASSED]
+test/test_esc_dashboard/test_main.cpp:208: test_reversal_does_not_reuse_forward_velocity	[PASSED]
+test/test_esc_dashboard/test_main.cpp:209: test_invalid_or_contradictory_command_cannot_drive	[PASSED]
+test/test_esc_dashboard/test_main.cpp:210: test_time_gap_and_wrap_are_bounded	[PASSED]
+test/test_esc_dashboard/test_main.cpp:211: test_command_is_clamped_to_display_limits	[PASSED]
+test/test_esc_dashboard/test_main.cpp:212: test_live_snapshot_and_optical_lights_follow_source	[PASSED]
+------------- native:test_esc_dashboard [PASSED] Took 0.44 seconds -------------
+
+Processing test_storm in native environment
+--------------------------------------------------------------------------------
+Building...
+Testing...
+test/test_storm/test_main.cpp:138: archive_integrity	[PASSED]
+test/test_storm/test_main.cpp:139: ghost_bounds	[PASSED]
+test/test_storm/test_main.cpp:140: timer	[PASSED]
+test/test_storm/test_main.cpp:141: events	[PASSED]
+test/test_storm/test_main.cpp:142: wrap	[PASSED]
+test/test_storm/test_main.cpp:143: timeout	[PASSED]
+test/test_storm/test_main.cpp:144: deterministic	[PASSED]
+test/test_storm/test_main.cpp:145: show	[PASSED]
+test/test_storm/test_main.cpp:146: long_session	[PASSED]
+----------------- native:test_storm [PASSED] Took 0.31 seconds -----------------
+
+Processing test_show in native environment
+--------------------------------------------------------------------------------
+Building...
+Testing...
+test/test_show/test_main.cpp:211: test_duration_is_exact_and_delayed_render_cannot_extend_show	[PASSED]
+test/test_show/test_main.cpp:212: test_cancel_and_repeat_restart_every_field	[PASSED]
+test/test_show/test_main.cpp:213: test_time_wrap_keeps_phases_and_completion_correct	[PASSED]
+test/test_show/test_main.cpp:214: test_timeline_boundaries_and_values_are_bounded_and_monotonic	[PASSED]
+test/test_show/test_main.cpp:215: test_every_phase_keeps_cad_geometry_and_demo_badges_visible	[PASSED]
+test/test_show/test_main.cpp:216: test_profile_rejection_is_explicit_and_does_not_clip	[PASSED]
+test/test_show/test_main.cpp:217: test_english_captions_preserve_apertures_and_persistent_demo	[PASSED]
+test/test_show/test_main.cpp:218: test_show_distance_is_integral_of_speed_and_reaches_real_first_turn	[PASSED]
+test/test_show/test_main.cpp:219: test_show_uses_real_instruments_and_one_coherent_vehicle_state	[PASSED]
+----------------- native:test_show [PASSED] Took 0.53 seconds -----------------
+
+Processing test_esc_calibration in native environment
+--------------------------------------------------------------------------------
+Building...
+Testing...
+test/test_esc_calibration/test_main.cpp:39: calibration_rescales_only_forward	[PASSED]
+test/test_esc_calibration/test_main.cpp:39: invalid_calibration_cannot_change_scale	[PASSED]
+test/test_esc_calibration/test_main.cpp:39: both_polarities_and_new_neutral_work	[PASSED]
+test/test_esc_calibration/test_main.cpp:39: wider_than_nominal_travel_still_reaches_full_scale	[PASSED]
+------------ native:test_esc_calibration [PASSED] Took 0.31 seconds ------------
+
+Processing test_button in native environment
+--------------------------------------------------------------------------------
+Building...
+Testing...
+test/test_button/test_main.cpp:28: short_press	[PASSED]
+test/test_button/test_main.cpp:28: bounce_ignored	[PASSED]
+test/test_button/test_main.cpp:28: long_press_does_not_start_show_on_release	[PASSED]
+test/test_button/test_main.cpp:28: wraps_millis	[PASSED]
+test/test_button/test_main.cpp:28: animation_wrap	[PASSED]
+---------------- native:test_button [PASSED] Took 0.31 seconds ----------------
+
+Processing test_diagnostics in native environment
+--------------------------------------------------------------------------------
+Building...
+Testing...
+test/test_diagnostics/test_main.cpp:194: test_out_of_order_task_clocks_do_not_jump_uptime	[PASSED]
+test/test_diagnostics/test_main.cpp:195: test_snapshot_contract_and_slow_health	[PASSED]
+test/test_diagnostics/test_main.cpp:196: test_frame_window_average_max_and_fps	[PASSED]
+test/test_diagnostics/test_main.cpp:197: test_clock_and_frame_window_survive_millis_wrap	[PASSED]
+test/test_diagnostics/test_main.cpp:198: test_input_gap_stale_timeout_and_rtt	[PASSED]
+test/test_diagnostics/test_main.cpp:199: test_identity_and_error_strings_are_bounded	[PASSED]
+test/test_diagnostics/test_main.cpp:200: test_external_display_window_preserves_running_total	[PASSED]
+-------------- native:test_diagnostics [PASSED] Took 0.40 seconds --------------
+
+Processing test_instrument_data in native environment
+--------------------------------------------------------------------------------
+Building...
+Testing...
+test/test_instrument_data/test_main.cpp:59: test_units_match_between_driver_and_navigation	[PASSED]
+test/test_instrument_data/test_main.cpp:60: test_navigation_caution_is_not_an_engine_sensor_alarm	[PASSED]
+test/test_instrument_data/test_main.cpp:61: test_calibration_and_invalid_values_do_not_leak_into_normal_display	[PASSED]
+------------ native:test_instrument_data [PASSED] Took 0.31 seconds ------------
+
+Processing test_startup in native environment
+--------------------------------------------------------------------------------
+Building...
+Testing...
+test/test_startup/test_main.cpp:163: test_duration_cancel_restart_and_wrap	[PASSED]
+test/test_startup/test_main.cpp:164: test_phase_boundaries_are_exact	[PASSED]
+test/test_startup/test_main.cpp:165: test_all_phases_preserve_apertures_demo_and_bounds	[PASSED]
+test/test_startup/test_main.cpp:166: test_first_second_checks_all_lcd_segments_then_clears	[PASSED]
+test/test_startup/test_main.cpp:167: test_idle_matches_normal_instruments_and_does_not_move	[PASSED]
+test/test_startup/test_main.cpp:168: test_chart_reveal_keeps_real_readouts_and_demo_without_fake_status	[PASSED]
+test/test_startup/test_main.cpp:169: test_inactive_and_unsupported_profiles_clear_safely	[PASSED]
+---------------- native:test_startup [PASSED] Took 0.53 seconds ----------------
+
+Processing test_wow_integration in native environment
+--------------------------------------------------------------------------------
+Building...
+Testing...
+test/test_wow_integration/test_main.cpp:114: wire_contract	[PASSED]
+test/test_wow_integration/test_main.cpp:115: modes_and_return	[PASSED]
+test/test_wow_integration/test_main.cpp:116: trail_survives_modes_and_reacts	[PASSED]
+test/test_wow_integration/test_main.cpp:117: controls_are_mode_scoped	[PASSED]
+test/test_wow_integration/test_main.cpp:118: record_integrity_and_mode_switch	[PASSED]
+------------ native:test_wow_integration [PASSED] Took 0.31 seconds ------------
+
+=================================== SUMMARY ===================================
+Environment    Test                    Status    Duration
+-------------  ----------------------  --------  ------------
+native         test_config_integrity   PASSED    00:00:03.546
+native         test_instruments_pilot  PASSED    00:00:00.810
+native         test_wow                PASSED    00:00:00.607
+native         test_recoil             PASSED    00:00:00.740
+native         test_instruments_nav    PASSED    00:00:00.754
+native         test_esc_logic          PASSED    00:00:00.485
+native         test_storage_boot       PASSED    00:00:00.710
+native         test_core               PASSED    00:00:00.617
+native         test_ui_settings        PASSED    00:00:03.347
+native         test_esc_dashboard      PASSED    00:00:00.445
+native         test_storm              PASSED    00:00:00.310
+native         test_show               PASSED    00:00:00.529
+native         test_esc_calibration    PASSED    00:00:00.306
+native         test_button             PASSED    00:00:00.305
+native         test_diagnostics        PASSED    00:00:00.400
+native         test_instrument_data    PASSED    00:00:00.312
+native         test_startup            PASSED    00:00:00.531
+native         test_wow_integration    PASSED    00:00:00.310
+================ 183 test cases: 183 succeeded in 00:00:15.064 ================

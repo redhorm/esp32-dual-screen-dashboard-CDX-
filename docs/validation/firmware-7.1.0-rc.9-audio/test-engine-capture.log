@@ -1,0 +1,10 @@
+PASS No autoplay; explicit gesture starts engine; RPM, reverse, volume and stop are read-only
+PASS Invalid, absent or demo telemetry stops sound and cannot auto-restart
+PASS Frozen timestamps, invalid JSON and network failure terminate playback
+PASS Tab exit, page hiding and changing instrument mode release audio
+PASS Stop during deferred browser resume cannot resurrect the old audio session
+PASS Stop during pending telemetry discards late data and permits a deliberate restart
+PASS Pending transport times out without leaving audio or replaying old data
+PASS A blocked shared HTTP lane expires audio reads without replay after release
+PASS Unavailable or rejected browser audio reports an actionable stopped state
+9 engine audio integration groups passed; HTTP/Web Audio fixtures only, no receiver or motor commands.

@@ -177,6 +177,15 @@ p{color:var(--muted);margin:12px 0 20px}h1,h2,h3{margin:0;line-height:1.08;font-
   #pitControls input[type='checkbox'] { appearance: auto; -webkit-appearance: auto; }
   #pitControls input[type='checkbox']::after { display: none; }
 }
+/* Engine sound: phone-only controls using portal tokens. */
+#pitControls .engine-card h2 { font-size:clamp(28px,4vw,42px); margin-top:18px; }
+#pitControls .engine-card .row { flex-wrap:wrap; }
+#pitControls .engine-card .eyebrow { margin-bottom:0; }
+#pitControls .engine-meter { height:6px; margin:22px 0; background:var(--line); overflow:hidden; border-radius:3px; }
+#pitControls .engine-meter i { display:block; height:100%; background:var(--accent); transform-origin:left; transform:scaleX(var(--engine-level,0)); transition:transform .15s linear; }
+#pitControls .engine-running .pill { border-color:var(--accent); color:var(--accent); }
+#pitControls .engine-card .status { margin-top:16px; }
+@media(prefers-reduced-motion:reduce){#pitControls .engine-meter i { transition:none; }}
 </style>
 </head>
 <body data-theme="dark">
@@ -307,6 +316,17 @@ p{color:var(--muted);margin:12px 0 20px}h1,h2,h3{margin:0;line-height:1.08;font-
 <div id="pit-fullThrottleCalibration" class="stack" hidden><p>1. Solleva il modello lasciando libere le ruote. 2. Tieni tutto gas AVANTI. 3. Premi LEGGI E SALVA; dopo la conferma rilascia il gas.</p><button id="pit-captureFullThrottle" type="button">LEGGI E SALVA</button><button id="pit-cancelFullThrottle" type="button">ANNULLA</button></div>
 </div></div></fieldset><div class="status" id="pit-escSaveStatus" role="status"></div></form>
 <button data-action="exit" class="quiet">Mostra strumenti sul dashboard</button></article></div>
+<div class="pit-group engine-group"><div class="group-copy"><span class="module-index" aria-hidden="true">01 B / ENGINE</span><h2 data-it="Suono motore" data-en="Engine sound">Suono motore</h2><p class="fine">Il gas della radio diventa il suono del tuo cockpit.</p></div>
+<article class="card engine-card" id="engine-panel"><div class="row"><span class="eyebrow">V8 / OFFROAD</span><span class="pill" data-it="AUDIO SUL TELEFONO" data-en="PHONE AUDIO">AUDIO SUL TELEFONO</span></div>
+<h2 data-it="Dagli voce." data-en="Give it a voice.">Dagli voce.</h2>
+<p class="fine" data-it="Avviamento, minimo, accelerazione, cambiate e limitatore. Il suono sintetizzato segue gli RPM simulati degli strumenti dal gas." data-en="Startup, idle, acceleration, shifts and rev limiter. Synthesized sound follows the throttle-driven instruments’ simulated RPM.">Avviamento, minimo, accelerazione, cambiate e limitatore. Il suono sintetizzato segue gli RPM simulati degli strumenti dal gas.</p>
+<div class="grid"><div class="metric"><small>RPM / AUDIO</small><strong id="engine-rpm">—</strong></div><div class="metric"><small data-it="MARCIA SIMULATA" data-en="SIMULATED GEAR">MARCIA SIMULATA</small><strong id="engine-gear">—</strong></div></div>
+<div id="engine-meter" class="engine-meter" aria-hidden="true"><i></i></div>
+<label class="field" for="engine-volume"><span class="row"><span data-it="Volume motore" data-en="Engine volume">Volume motore</span><output id="engine-volume-value" for="engine-volume">25%</output></span><input id="engine-volume" type="range" min="0" max="100" value="25"></label>
+<div class="actions"><button type="button" class="primary" id="engine-start" disabled>Avvia motore</button><button type="button" id="engine-stop" disabled>Spegni</button></div>
+<p class="status" id="engine-status" role="status" aria-live="polite">Tocca Avvia motore. L’audio viene riprodotto dal telefono.</p>
+<p class="fine" data-it="Attiva gli strumenti ESC e resta in questa schermata con il telefono sbloccato. Uscendo, perdendo il PWM o il Wi-Fi, il suono si ferma. Regola anche il volume multimediale del telefono." data-en="Enable ESC instruments and keep this screen open with your phone unlocked. Leaving, losing PWM or Wi-Fi stops the sound. Also adjust your phone’s media volume.">Attiva gli strumenti ESC e resta in questa schermata con il telefono sbloccato. Uscendo, perdendo il PWM o il Wi-Fi, il suono si ferma. Regola anche il volume multimediale del telefono.</p>
+</article></div>
 <div class="pit-group lights-group" id="pit-lightsSection"><div class="group-copy"><span class="module-index" aria-hidden="true">02 / OUTPUT</span><h2>Luci</h2><p class="fine">Stop e retromarcia seguono il PWM del ricevitore, anche con gli strumenti in DEMO.</p></div><div class="pit-grid"><article class="card"><div class="eyebrow" data-it="CONTROLLO LUCI" data-en="LIGHT CONTROL">CONTROLLO LUCI</div><h2 data-it="Luci posteriori" data-en="Rear lights">Luci posteriori</h2><p class="muted fine" data-it="Comandi della barra già prevista su GPIO 4. Le luci freno e retro del ricevitore mantengono la priorità." data-en="Controls for the existing light bar on GPIO 4. Receiver brake and reverse retain priority.">Comandi della barra già prevista su GPIO 4. Le luci freno e retro del ricevitore mantengono la priorità.</p><div class="rtl" id="pit-rtlPixels" aria-label="16 LED"></div>
 <div class="commands"><button data-rtl="left" data-it="← SINISTRA" data-en="← LEFT">← SINISTRA</button><button data-rtl="hazard" data-it="EMERGENZA" data-en="HAZARD">EMERGENZA</button><button data-rtl="right" data-it="DESTRA →" data-en="RIGHT →">DESTRA →</button><button data-rtl="brake" data-it="STOP" data-en="BRAKE">STOP</button><button data-rtl="reverse_work" data-it="RETRO" data-en="REVERSE">RETRO</button><button data-rtl="dust_chase" data-it="POLVERE" data-en="DUST">POLVERE</button></div><button class="wide" style="margin-top:10px" data-rtl="clear" data-it="RIPRISTINA AUTOMATICO" data-en="RESTORE AUTOMATIC">RIPRISTINA AUTOMATICO</button><div class="status" id="pit-lightStatus" role="status"></div><p class="fine" data-it="Uscendo da questa sezione, i comandi manuali vengono rilasciati. In caso di disconnessione interviene il timeout di 1,5 s." data-en="Leaving this section releases manual commands. A 1.5 s timeout applies after disconnection.">Uscendo da questa sezione, i comandi manuali vengono rilasciati. In caso di disconnessione interviene il timeout di 1,5 s.</p></article>
 <article class="card lights-card"><div class="eyebrow">USCITA LUCI</div><h2>Barra ed effetti</h2>
@@ -387,6 +407,7 @@ function controls(){
   $('jump').disabled=!online||busy||!state||state.mode!==2||state.done;
   $('card').disabled=!online&&(!historyRows||!historyRows.length);
   wowControls();
+  if(window.stormEngineAudio)window.stormEngineAudio.sync();
 }
 function connected(value){if(!value)haltWow(false);online=value;$('status').textContent=value?'● Online':'○ Offline';$('status').setAttribute('data-online',String(value));$('status').setAttribute('aria-label',value?'Collegato al cruscotto':'Collegamento assente');$('homeConnection').textContent=value?'Collegato al tuo cockpit':'Offline · collega il Wi-Fi stormDASH';$('networkHelp').classList.toggle('hidden',value);controls();if(window.stormPit)window.stormPit.connectionChanged()}
 function render(s){
@@ -412,6 +433,7 @@ async function send(action,value){
   if(!online){msg('Ricollegati al cruscotto prima di inviare comandi.');return false}
   if(busy)return false;
   if(['exit','start','show','game','pit','board','midnight','living','liquid','garage','beat'].includes(action))haltWow(true);
+  if(window.stormEngineAudio&&['exit','start','show','game','pit','board','midnight','living','liquid','garage','beat'].includes(action))window.stormEngineAudio.stop('mode');
   busy=true;controls();let accepted=false;
   try{await requestJSON('/api/storm',{method:'POST',body:new URLSearchParams({action,...(value===undefined?{}:{value})})});accepted=true;if(action!=='jump')msg('Comando acquisito dal cruscotto.')}
   catch(e){if(!e.status&&e.code!=='queue_timeout')connected(false);msg(errorMessage(e,'Risposta non ricevuta: verifica lo stato prima di ripetere il comando.'))}
@@ -429,7 +451,7 @@ function background(){
 function navigate(tab){
   if(!['home','trail','arcade','wow','pit'].includes(tab))return;
   if((activeTab==='arcade'||activeTab==='wow')&&tab!==activeTab)background();
-  activeTab=tab;all('section').forEach(s=>s.classList.toggle('hidden',s.id!==activeTab));
+  activeTab=tab;if(window.stormEngineAudio)window.stormEngineAudio.sync();all('section').forEach(s=>s.classList.toggle('hidden',s.id!==activeTab));
   all('[data-tab]').forEach(b=>{const selected=b.dataset.tab===tab;b.classList.toggle('active',selected);b.setAttribute('aria-pressed',String(selected));b.setAttribute('aria-current',selected?'page':'false')});
   $('appMain').setAttribute('data-page',tab);
   if(window.stormPit)window.stormPit.setActive(activeTab==='pit');
@@ -652,7 +674,7 @@ let manual='clear',mutationBusy=false,pollBusy=false,pollTimer=0,lastSlow=0,conn
 const readIssues=new Map();
 const tr=(it,en)=>language?en:it;
 function message(id,text,error=false){const e=$(id);e.textContent=text;e.className='status '+(error?'error':'ok');}
-function translate(){document.documentElement.lang=language?'en':'it';root.querySelectorAll('[data-it]').forEach(e=>{const value=language?e.dataset.en:e.dataset.it;if(e.hasAttribute('data-html'))e.innerHTML=value;else e.textContent=value;});root.querySelectorAll('[data-label-it]').forEach(e=>e.setAttribute('aria-label',language?e.dataset.labelEn:e.dataset.labelIt));renderShow();renderLights();renderTelemetry();}
+function translate(){document.documentElement.lang=language?'en':'it';root.querySelectorAll('[data-it]').forEach(e=>{const value=language?e.dataset.en:e.dataset.it;if(e.hasAttribute('data-html'))e.innerHTML=value;else e.textContent=value;});root.querySelectorAll('[data-label-it]').forEach(e=>e.setAttribute('aria-label',language?e.dataset.labelEn:e.dataset.labelIt));renderShow();renderLights();renderTelemetry();if(window.stormEngineAudio)window.stormEngineAudio.sync();}
 function connection(){
  const ready=settingsLoaded&&identityLoaded&&lightLoaded&&escLoaded&&telemetryLoaded&&displayLoaded;
  connected=ready&&online;
@@ -715,7 +737,7 @@ async function poll(){
  }finally{pollBusy=false;connection();renderShow();schedulePoll(showState.active||manual!=='clear'?500:1100)}
 }
 function clearManual(){const had=manual!=='clear';manual='clear';renderLights();if(had){const data=new URLSearchParams({function:'clear'});if(document.hidden&&navigator.sendBeacon)navigator.sendBeacon('/api/lights/command',data);else request('/api/lights/command',{function:'clear'},1200).catch(()=>{});}}
-$('showButton').onclick=()=>action($('showButton'),'showStatus',async()=>{const active=showState.pending?showState.requestedActive:showState.active;showState=await request('/api/show',{action:active?'stop':'start'});message('showStatus',active?tr('Ritorno alla guida.','Returning to drive.'):tr('SHOW avviato. Guarda i due display.','SHOW started. Watch both displays.'));renderShow();});
+$('showButton').onclick=()=>{if(window.stormEngineAudio)window.stormEngineAudio.stop('mode');return action($('showButton'),'showStatus',async()=>{const active=showState.pending?showState.requestedActive:showState.active;showState=await request('/api/show',{action:active?'stop':'start'});message('showStatus',active?tr('Ritorno alla guida.','Returning to drive.'):tr('SHOW avviato. Guarda i due display.','SHOW started. Watch both displays.'));renderShow();});};
 $('identityForm').onsubmit=e=>{e.preventDefault();const f=e.currentTarget;action(f.querySelector('button'),'identityStatus',async()=>{await request('/api/v3/profile',formValues(f));identityLoaded=false;await loadIdentity();message('identityStatus',tr('Nome salvato.','Name saved.'));});};
 $('displayForm').onsubmit=e=>{e.preventDefault();const f=e.currentTarget;action(f.querySelector('button'),'displayStatus',async()=>{await request('/api/settings',formValues(f));language=Number(f.elements.language.value)===1?1:0;translate();message('displayStatus',tr('Display aggiornati.','Displays updated.'));});};
 $('escForm').elements.escType.onchange=renderEscFields;
@@ -765,6 +787,197 @@ window.stormPit={connectionChanged(){connection();renderShow();},instrumentLabel
 }};
 if(typeof activeTab!=='undefined'&&activeTab==='pit')window.stormPit.setActive(true);
 
+})();
+</script>
+<script>/* Procedural, phone-local V8 impression. No samples, network or microphone. */
+(()=>{
+'use strict';
+const clamp=(n,lo,hi)=>Math.min(hi,Math.max(lo,n));
+window.StormEngineSynth={create(context){
+  const nodes=[],sources=[];
+  const node=n=>{nodes.push(n);return n;};
+  const oscillator=()=>{const n=node(context.createOscillator());sources.push(n);return n;};
+  const gain=value=>{const n=node(context.createGain());n.gain.value=value;return n;};
+  let started=false,stopped=false,lastGear=null,lastSample=-Infinity,firstSample=-Infinity;
+  let volume=.3;
+  const fire=oscillator(),rumble=oscillator(),flutter=oscillator();
+  const fireGain=gain(.30),rumbleGain=gain(.08),noiseGain=gain(.012);
+  const mix=gain(1),shift=gain(1),limiter=gain(1),limiterDepth=gain(0);
+  const volumeGain=gain(volume*.65),safety=gain(0);
+  const filter=node(context.createBiquadFilter());filter.type='lowpass';filter.frequency.value=650;filter.Q.value=.65;
+  const compressor=node(context.createDynamicsCompressor());
+  compressor.threshold.value=-14;compressor.knee.value=12;compressor.ratio.value=4;
+  compressor.attack.value=.004;compressor.release.value=.09;
+
+  // Four firing events/revolution for a four-stroke V8. Harmonics carry the
+  // exhaust timbre; a softer half-rate component keeps idle from sounding pure.
+  const real=new Float32Array(13),imag=new Float32Array(13);
+  for(let i=1;i<imag.length;i++)imag[i]=(i%2?1:.67)/Math.pow(i,1.05);
+  fire.setPeriodicWave(context.createPeriodicWave(real,imag));fire.frequency.value=53.333;
+  rumble.type='sine';rumble.frequency.value=26.667;
+  flutter.type='square';flutter.frequency.value=12;
+  fire.connect(fireGain).connect(mix);rumble.connect(rumbleGain).connect(mix);
+  const noise=node(context.createBufferSource());sources.push(noise);
+  const buffer=context.createBuffer(1,Math.max(1,Math.floor(context.sampleRate)),context.sampleRate);
+  const samples=buffer.getChannelData(0);let seed=0x7135,previous=0;
+  for(let i=0;i<samples.length;i++){
+    seed=(Math.imul(seed,1664525)+1013904223)>>>0;
+    previous=.82*previous+.18*(seed/2147483648-1);samples[i]=previous;
+  }
+  noise.buffer=buffer;noise.loop=true;noise.connect(noiseGain).connect(mix);
+  flutter.connect(limiterDepth).connect(limiter.gain);
+  mix.connect(filter).connect(shift).connect(limiter).connect(volumeGain).connect(compressor).connect(safety).connect(context.destination);
+
+  function target(param,value,now,seconds=.045){
+    // cancelAndHoldAtTime is absent on some captive-portal WebKit versions.
+    if(typeof param.cancelAndHoldAtTime==='function')param.cancelAndHoldAtTime(now);
+    else {const current=param.value;param.cancelScheduledValues(now);param.setValueAtTime(current,now);}
+    param.setTargetAtTime(value,now,seconds);
+  }
+  function freshGain(now){
+    const age=now-lastSample;
+    if(age<0||!Number.isFinite(age))return 0;
+    if(age<.035)return age/.035;
+    if(age<=.85)return 1;
+    return clamp((1.15-age)/.30,0,1);
+  }
+  function armFreshness(now){
+    const current=freshGain(now);
+    safety.gain.cancelScheduledValues(now);safety.gain.setValueAtTime(current,now);
+    safety.gain.linearRampToValueAtTime(1,now+.035);
+    safety.gain.setValueAtTime(1,now+.85);
+    safety.gain.linearRampToValueAtTime(0,now+1.15);
+    lastSample=now;
+  }
+  function setVolume(value){
+    if(stopped||!Number.isFinite(value))return;
+    volume=clamp(value,0,1);target(volumeGain.gain,volume*.65,context.currentTime,.02);
+    // Volume changes never refresh the sample watchdog.
+  }
+  function start(){
+    if(stopped||started)return;
+    started=true;for(const source of sources)source.start();
+    // Starting a context alone must remain silent until a valid PWM snapshot.
+  }
+  function update(sample,nextVolume){
+    if(stopped||!started||!sample||!Number.isFinite(sample.rpm)||
+       !Number.isInteger(sample.gear)||sample.gear<-1||sample.gear>5||sample.rpm<0)return false;
+    if(Number.isFinite(nextVolume))setVolume(nextVolume);
+    const now=context.currentTime,rpm=clamp(sample.rpm,800,8000),load=(rpm-800)/7200;
+    const pitch=rpm/60*4;
+    if(firstSample===-Infinity){
+      firstSample=now;
+      fire.frequency.setValueAtTime(18,now);fire.frequency.linearRampToValueAtTime(pitch,now+.55);
+      rumble.frequency.setValueAtTime(9,now);rumble.frequency.linearRampToValueAtTime(pitch*.5,now+.55);
+    }else if(now-firstSample<.55){
+      // Replace only the future crank target, retaining the current ramp value.
+      for(const [param,value]of [[fire.frequency,pitch],[rumble.frequency,pitch*.5]]){
+        if(typeof param.cancelAndHoldAtTime==='function')param.cancelAndHoldAtTime(now);
+        else{const current=param.value;param.cancelScheduledValues(now);param.setValueAtTime(current,now);}
+        param.linearRampToValueAtTime(value,firstSample+.55);
+      }
+    }else{
+      target(fire.frequency,pitch,now);target(rumble.frequency,pitch*.5,now);
+    }
+    target(filter.frequency,650+load*2600,now,.07);
+    target(fireGain.gain,.30+load*.10,now);target(noiseGain.gain,.012+load*.065,now);
+    // Only forward-to-forward gear changes cut the sound; N/R transitions do
+    // not invent a gearshift. RPM comes from the same scenic data as the TFT.
+    if(lastGear>0&&sample.gear>0&&lastGear!==sample.gear){
+      shift.gain.cancelScheduledValues(now);shift.gain.setValueAtTime(1,now);
+      shift.gain.linearRampToValueAtTime(.24,now+.018);
+      shift.gain.linearRampToValueAtTime(1,now+.16);
+    }
+    lastGear=sample.gear;
+    const limiting=sample.gear===5&&rpm>=6950;
+    target(limiter.gain,limiting?.52:1,now,.015);
+    target(limiterDepth.gain,limiting?.48:0,now,.015);
+    armFreshness(now);return true;
+  }
+  function stop(){
+    if(stopped)return;stopped=true;
+    safety.gain.cancelScheduledValues(context.currentTime);safety.gain.setValueAtTime(0,context.currentTime);
+    for(const source of sources){try{source.stop()}catch(_){}}
+    for(const n of nodes){try{n.disconnect()}catch(_){}}
+  }
+  return {start,update,setVolume,stop};
+}};
+})();
+</script>
+<script>(()=>{
+'use strict';
+const $=id=>document.getElementById('engine-'+id);
+let ctx=null,synth=null,epoch=0,active=false,pending=false,timer=0,guard=0,last=0,stamp=null,volume=.25;
+const clock=()=>performance.now();
+const eligible=()=>online&&activeTab==='pit'&&!document.hidden&&state&&state.mode===0;
+function paint(){
+ $('start').disabled=active||pending||!eligible();$('stop').disabled=!active&&!pending;
+ $('status').dataset.state=pending?'starting':active?'running':'off';
+ $('panel').classList.toggle('engine-running',active);$('volume-value').textContent=Math.round(volume*100)+'%';
+}
+function status(it,en){$('status').textContent=document.documentElement.lang==='en'?en:it;}
+function stop(reason='stop'){
+ ++epoch;active=pending=false;clearTimeout(timer);clearTimeout(guard);stamp=null;
+ const s=synth,c=ctx;synth=ctx=null;
+ if(c)c.onstatechange=null;
+ if(s)try{s.stop();}catch(_){}
+ if(c)try{Promise.resolve(c.close()).catch(()=>{});}catch(_){}
+ $('rpm').textContent='—';$('gear').textContent='—';$('meter').style.setProperty('--engine-level','0');
+ const messages={
+ stop:['Motore spento. Tocca Avvia per ripartire.','Engine off. Tap Start to restart.'],
+ signal:['Audio fermo: attiva gli strumenti ESC e verifica il PWM. Poi premi Avvia.','Audio stopped: enable ESC instruments and check PWM. Then tap Start.'],
+ stale:['Audio fermo: dati del gas non aggiornati. Verifica il collegamento e premi Avvia.','Audio stopped: throttle data is stale. Check connection and tap Start.'],
+ network:['Audio fermo: risposta non ricevuta. Verifica il Wi-Fi e premi Avvia.','Audio stopped: no response. Check Wi-Fi and tap Start.'],
+ busy:['Audio fermo: cruscotto occupato. Riprova con Avvia.','Audio stopped: dashboard busy. Tap Start to retry.'],
+ invalid:['Audio fermo: dati strumenti non validi. Aggiorna il firmware e riprova.','Audio stopped: invalid instrument data. Update firmware and retry.'],
+ interrupted:['Audio sospeso dal telefono. Tocca Avvia per riprendere.','Audio interrupted by the phone. Tap Start to resume.'],
+ hidden:['Audio fermo uscendo dalla schermata. Tocca Avvia per riprendere.','Audio stopped on leaving the screen. Tap Start to resume.'],
+ mode:['Torna agli strumenti e premi Avvia motore.','Return to instruments and tap Start engine.']};
+ status(...(messages[reason]||messages.stop));paint();
+}
+function sync(){if((active||pending)&&!eligible())stop(!online?'network':state&&state.mode!==0?'mode':'hidden');else paint();}
+function watch(e){if(e!==epoch)return;if(!eligible()){sync();return;}if(clock()-last>=1200){stop('stale');return;}guard=setTimeout(()=>watch(e),100);}
+async function tick(e){
+ if(e!==epoch||!active)return;if(!eligible()){sync();return;}
+ const begin=clock();
+ try{
+  const data=await window.stormRequest('/api/v4/state',{},800);
+  if(e!==epoch)return;if(!eligible()){sync();return;}
+  if(ctx.state!=='running')throw {code:'interrupted'};
+  if(!data||data.telemetrySource!=='esc_pwm_scenic'||data.escSignalValid!==true)throw {code:'signal'};
+  const v=data.vehicle;
+  if(!v||!Number.isFinite(v.rpm)||v.rpm<0||v.rpm>8000||!Number.isInteger(v.gear)||v.gear < -1||v.gear>5||!Number.isInteger(data.nowMs)||data.nowMs<0||data.nowMs>4294967295)throw {code:'invalid'};
+  if(clock()-begin>=1000)throw {code:'stale'};
+  const advance=stamp===null?1:(data.nowMs-stamp)>>>0;
+  if(advance>=0x80000000)throw {code:'stale'};
+  if(advance){stamp=data.nowMs;last=clock();synth.update(v,volume);
+   $('rpm').textContent=String(Math.round(Math.max(800,v.rpm)));$('gear').textContent=v.gear<0?'R':v.gear===0?'N':String(v.gear);
+   $('meter').style.setProperty('--engine-level',String(Math.min(1,Math.max(0,(v.rpm-800)/6400))));
+   status('Motore attivo · segue RPM e marce del cruscotto.','Engine on · following dashboard RPM and gears.');paint();
+  }
+ }catch(err){if(e===epoch)stop(err.code==='queue_timeout'?'busy':['signal','invalid','stale','interrupted'].includes(err.code)?err.code:'network');return;}
+ if(e===epoch)timer=setTimeout(()=>tick(e),Math.max(40,200-(clock()-begin)));
+}
+async function start(){
+ if(active||pending||!eligible())return;
+ const Context=window.AudioContext||window.webkitAudioContext;
+ if(!Context){status('Audio non supportato. Apri in Safari o Chrome.','Audio unsupported. Open in Safari or Chrome.');return;}
+ stop();pending=true;const e=epoch;last=clock();status('Avviamento · lettura del gas…','Starting · reading throttle…');paint();
+ try{
+  ctx=new Context();const own=ctx;
+  // Unlock in the explicit tap before awaiting telemetry (iPhone autoplay).
+  const resumed=own.resume();synth=window.StormEngineSynth.create(own);synth.start();guard=setTimeout(()=>watch(e),100);
+  await resumed;if(e!==epoch)return;if(!eligible()){sync();return;}
+  if(own.state!=='running')throw Error('interrupted');
+  own.onstatechange=()=>{if(e===epoch&&own.state!=='running')stop('interrupted');};
+  pending=false;active=true;paint();await tick(e);
+ }catch(_){if(e===epoch)stop('interrupted');}
+}
+$('start').onclick=start;$('stop').onclick=()=>stop();
+$('volume').oninput=()=>{const v=Number($('volume').value);volume=Number.isFinite(v)?Math.max(0,Math.min(1,v/100)):0;if(synth)synth.setVolume(volume);paint();};
+document.addEventListener('visibilitychange',()=>{if(document.hidden&&(active||pending))stop('hidden');else sync();});
+window.addEventListener('pagehide',()=>{if(active||pending)stop('hidden');});
+window.stormEngineAudio={stop,sync,isActive:()=>active||pending};paint();
 })();
 </script>
 <script>/* Browser-only presentation preferences. No API, hardware or application state changes. */

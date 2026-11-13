@@ -1,0 +1,281 @@
+Processing esp32-s3-devkitc-1 (platform: espressif32 @ 7.0.1; board: esp32-s3-devkitc-1; framework: arduino)
+--------------------------------------------------------------------------------
+Verbose mode can be enabled via `-v, --verbose` option
+CONFIGURATION: https://docs.platformio.org/page/boards/espressif32/esp32-s3-devkitc-1.html
+PLATFORM: Espressif 32 (7.0.1) > Espressif ESP32-S3-DevKitC-1-N8 (8 MB QD, No PSRAM)
+HARDWARE: ESP32S3 240MHz, 320KB RAM, 8MB Flash
+DEBUG: Current (esp-builtin) On-board (esp-builtin) External (cmsis-dap, esp-bridge, esp-prog, iot-bus-jtag, jlink, minimodule, olimex-arm-usb-ocd, olimex-arm-usb-ocd-h, olimex-arm-usb-tiny-h, olimex-jtag-tiny, tumpa)
+PACKAGES: 
+ - framework-arduinoespressif32 @ 3.20017.241212+sha.dcc1105b 
+ - tool-esptoolpy @ 2.41100.260830 (4.11.0) 
+ - toolchain-riscv32-esp @ 8.4.0+2021r2-patch5 
+ - toolchain-xtensa-esp32s3 @ 8.4.0+2021r2-patch5
+LDF: Library Dependency Finder -> https://bit.ly/configure-pio-ldf
+LDF Modes: Finder ~ chain, Compatibility ~ soft
+Found 35 compatible libraries
+Scanning dependencies...
+Dependency Graph
+|-- LovyanGFX @ 1.2.25
+|-- Adafruit NeoPixel @ 1.15.1
+|-- WiFi @ 2.0.0
+|-- LittleFS @ 2.0.0
+|-- Update @ 2.0.0
+|-- HTTPClient @ 2.0.0
+|-- Preferences @ 2.0.0
+|-- DNSServer @ 2.0.0
+|-- WebServer @ 2.0.0
+|-- FS @ 2.0.0
+Building in release mode
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/Fonts/IPA/lgfx_font_japan.c.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/Fonts/efont/lgfx_efont_cn.c.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/Fonts/efont/lgfx_efont_ja.c.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/Fonts/efont/lgfx_efont_kr.c.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/Fonts/efont/lgfx_efont_tw.c.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/utility/lgfx_miniz.c.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/utility/lgfx_pngle.c.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/utility/lgfx_qoi.c.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/utility/lgfx_qrcode.c.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/utility/lgfx_tjpgd.c.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/LGFXBase.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/LGFX_Button.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/LGFX_Sprite.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/lgfx_fonts.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/misc/DividedFrameBuffer.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/misc/SpriteBuffer.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/misc/common_function.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/misc/pixelcopy.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/panel/Panel_AMOLED.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/panel/Panel_Device.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/panel/Panel_ED2208.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/panel/Panel_EPDiy.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/panel/Panel_FlexibleFrameBuffer.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/panel/Panel_FrameBufferBase.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/panel/Panel_GDEW0154D67.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/panel/Panel_GDEW0154M09.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/panel/Panel_HUB75.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/panel/Panel_HasBuffer.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/panel/Panel_ILI9225.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/panel/Panel_IT8951.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/panel/Panel_LCD.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/panel/Panel_M5HDMI.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/panel/Panel_M5UnitGLASS.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/panel/Panel_M5UnitLCD.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/panel/Panel_NT35510.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/panel/Panel_NV3031B.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/panel/Panel_NV3041A.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/panel/Panel_RA8875.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/panel/Panel_RM68120.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/panel/Panel_SH8601Z.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/panel/Panel_SSD1306.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/panel/Panel_SSD1327.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/panel/Panel_SSD1331.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/panel/Panel_SSD1351.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/panel/Panel_SSD1677.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/panel/Panel_SSD1963.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/panel/Panel_SharpLCD.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/platforms/arduino_default/Bus_SPI.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/platforms/arduino_default/Bus_Stream.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/platforms/arduino_default/common.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/platforms/esp32/Bus_EPD.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/platforms/esp32/Bus_HUB75.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/platforms/esp32/Bus_I2C.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/platforms/esp32/Bus_Parallel8.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/platforms/esp32/Bus_SPI.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/platforms/esp32/Light_CH422G.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/platforms/esp32/Light_PWM.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/platforms/esp32/Panel_CVBS.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/platforms/esp32/Panel_EPD.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/platforms/esp32/common.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/platforms/esp32c3/Bus_Parallel8.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/platforms/esp32p4/Bus_DSI.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/platforms/esp32p4/Panel_DSI.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/platforms/esp32p4/Panel_LT8912B.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/platforms/esp32p4/Touch_ST7123.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/platforms/esp32s2/Bus_Parallel16.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/platforms/esp32s2/Bus_Parallel8.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/platforms/esp32s3/Bus_Parallel16.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/platforms/esp32s3/Bus_Parallel8.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/platforms/esp32s3/Bus_RGB.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/platforms/esp32s3/Panel_RGB.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/platforms/esp8266/Bus_I2C.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/platforms/esp8266/Bus_SPI.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/platforms/esp8266/common.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/platforms/framebuffer/Panel_fb.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/platforms/framebuffer/common.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/platforms/opencv/Panel_OpenCV.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/platforms/opencv/common.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/platforms/rp2040/Bus_I2C.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/platforms/rp2040/Bus_SPI.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/platforms/rp2040/Light_PWM.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/platforms/rp2040/common.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/platforms/samd21/Bus_I2C.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/platforms/samd21/Bus_SPI.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/platforms/samd21/common.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/platforms/samd51/Bus_I2C.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/platforms/samd51/Bus_SPI.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/platforms/samd51/common.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/platforms/sdl/Panel_sdl.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/platforms/sdl/common.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/platforms/spresense/Bus_SPI.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/platforms/spresense/common.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/platforms/stm32/Bus_SPI.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/platforms/stm32/common.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/touch/Touch_CHSC6540.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/touch/Touch_CHSC6x.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/touch/Touch_CSTxxx.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/touch/Touch_FT5x06.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/touch/Touch_GSLx680.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/touch/Touch_GT911.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/touch/Touch_NS2009.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/touch/Touch_RA8875.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/touch/Touch_STMPE610.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/touch/Touch_TT21xxx.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf85/LovyanGFX/lgfx/v1/touch/Touch_XPT2046.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/src/app/scene_dashboard.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/src/app/scene_navigator.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/src/app/scene_recoil.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/src/core/config_integrity.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/src/core/diagnostics.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/src/core/driver.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/src/core/esc_dashboard.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/src/core/esc_signal.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/src/core/experience.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/src/core/formatter.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/src/core/race.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/src/core/roadbook.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/src/core/rtl_logic.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/src/core/shift_light.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/src/core/show_sequence.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/src/core/simulator.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/src/hal/esc_pwm_input.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/src/hal/ws2812_rtl.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/src/main.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/src/services/config_portal.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/src/services/photo_store.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/src/services/storm_ota.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/src/services/storm_service.cpp.o
+Building .pio/build/esp32-s3-devkitc-1/bootloader.bin
+Generating partitions .pio/build/esp32-s3-devkitc-1/partitions.bin
+esptool.py v4.11.0
+Creating esp32s3 image...
+Merged 1 ELF section
+Successfully created esp32s3 image.
+Compiling .pio/build/esp32-s3-devkitc-1/lib235/SPI/SPI.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libe7c/Wire/Wire.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf59/Adafruit NeoPixel/Adafruit_NeoPixel.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf59/Adafruit NeoPixel/Adafruit_Neopixel_RP2.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf59/Adafruit NeoPixel/esp.c.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf59/Adafruit NeoPixel/esp8266.c.o
+Compiling .pio/build/esp32-s3-devkitc-1/libf59/Adafruit NeoPixel/kendyte_k210.c.o
+Compiling .pio/build/esp32-s3-devkitc-1/lib271/WiFi/WiFi.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/lib271/WiFi/WiFiAP.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/lib271/WiFi/WiFiClient.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/lib271/WiFi/WiFiGeneric.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/lib271/WiFi/WiFiMulti.cpp.o
+Archiving .pio/build/esp32-s3-devkitc-1/lib235/libSPI.a
+Indexing .pio/build/esp32-s3-devkitc-1/lib235/libSPI.a
+Archiving .pio/build/esp32-s3-devkitc-1/libe7c/libWire.a
+Compiling .pio/build/esp32-s3-devkitc-1/lib271/WiFi/WiFiSTA.cpp.o
+Indexing .pio/build/esp32-s3-devkitc-1/libe7c/libWire.a
+Compiling .pio/build/esp32-s3-devkitc-1/lib271/WiFi/WiFiScan.cpp.o
+Archiving .pio/build/esp32-s3-devkitc-1/libf59/libAdafruit NeoPixel.a
+Indexing .pio/build/esp32-s3-devkitc-1/libf59/libAdafruit NeoPixel.a
+Compiling .pio/build/esp32-s3-devkitc-1/lib271/WiFi/WiFiServer.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/lib271/WiFi/WiFiUdp.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/lib254/FS/FS.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/lib254/FS/vfs_api.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/lib6b8/LittleFS/LittleFS.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libbd4/Update/HttpsOTAUpdate.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libbd4/Update/Updater.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libfd8/WiFiClientSecure/WiFiClientSecure.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/libfd8/WiFiClientSecure/esp_crt_bundle.c.o
+Compiling .pio/build/esp32-s3-devkitc-1/libfd8/WiFiClientSecure/ssl_client.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/lib606/HTTPClient/HTTPClient.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/lib719/Preferences/Preferences.cpp.o
+Archiving .pio/build/esp32-s3-devkitc-1/lib271/libWiFi.a
+Indexing .pio/build/esp32-s3-devkitc-1/lib271/libWiFi.a
+Compiling .pio/build/esp32-s3-devkitc-1/lib72f/DNSServer/DNSServer.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/lib761/WebServer/Parsing.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/lib761/WebServer/WebServer.cpp.o
+Archiving .pio/build/esp32-s3-devkitc-1/lib254/libFS.a
+Indexing .pio/build/esp32-s3-devkitc-1/lib254/libFS.a
+Compiling .pio/build/esp32-s3-devkitc-1/lib761/WebServer/detail/mimetable.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/FrameworkArduino/Esp.cpp.o
+Archiving .pio/build/esp32-s3-devkitc-1/lib6b8/libLittleFS.a
+Indexing .pio/build/esp32-s3-devkitc-1/lib6b8/libLittleFS.a
+Compiling .pio/build/esp32-s3-devkitc-1/FrameworkArduino/FirmwareMSC.cpp.o
+Archiving .pio/build/esp32-s3-devkitc-1/libbd4/libUpdate.a
+Indexing .pio/build/esp32-s3-devkitc-1/libbd4/libUpdate.a
+Compiling .pio/build/esp32-s3-devkitc-1/FrameworkArduino/FunctionalInterrupt.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/FrameworkArduino/HWCDC.cpp.o
+Archiving .pio/build/esp32-s3-devkitc-1/lib719/libPreferences.a
+Archiving .pio/build/esp32-s3-devkitc-1/libfd8/libWiFiClientSecure.a
+Indexing .pio/build/esp32-s3-devkitc-1/lib719/libPreferences.a
+Indexing .pio/build/esp32-s3-devkitc-1/libfd8/libWiFiClientSecure.a
+Compiling .pio/build/esp32-s3-devkitc-1/FrameworkArduino/HardwareSerial.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/FrameworkArduino/IPAddress.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/FrameworkArduino/IPv6Address.cpp.o
+Archiving .pio/build/esp32-s3-devkitc-1/lib72f/libDNSServer.a
+Indexing .pio/build/esp32-s3-devkitc-1/lib72f/libDNSServer.a
+Compiling .pio/build/esp32-s3-devkitc-1/FrameworkArduino/MD5Builder.cpp.o
+Archiving .pio/build/esp32-s3-devkitc-1/lib606/libHTTPClient.a
+Indexing .pio/build/esp32-s3-devkitc-1/lib606/libHTTPClient.a
+Compiling .pio/build/esp32-s3-devkitc-1/FrameworkArduino/Print.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/FrameworkArduino/Stream.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/FrameworkArduino/StreamString.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/FrameworkArduino/Tone.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/FrameworkArduino/USB.cpp.o
+Archiving .pio/build/esp32-s3-devkitc-1/lib761/libWebServer.a
+Indexing .pio/build/esp32-s3-devkitc-1/lib761/libWebServer.a
+Compiling .pio/build/esp32-s3-devkitc-1/FrameworkArduino/USBCDC.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/FrameworkArduino/USBMSC.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/FrameworkArduino/WMath.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/FrameworkArduino/WString.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/FrameworkArduino/base64.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/FrameworkArduino/cbuf.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/FrameworkArduino/esp32-hal-adc.c.o
+Compiling .pio/build/esp32-s3-devkitc-1/FrameworkArduino/esp32-hal-bt.c.o
+Compiling .pio/build/esp32-s3-devkitc-1/FrameworkArduino/esp32-hal-cpu.c.o
+Compiling .pio/build/esp32-s3-devkitc-1/FrameworkArduino/esp32-hal-dac.c.o
+Compiling .pio/build/esp32-s3-devkitc-1/FrameworkArduino/esp32-hal-gpio.c.o
+Compiling .pio/build/esp32-s3-devkitc-1/FrameworkArduino/esp32-hal-i2c-slave.c.o
+Compiling .pio/build/esp32-s3-devkitc-1/FrameworkArduino/esp32-hal-i2c.c.o
+Compiling .pio/build/esp32-s3-devkitc-1/FrameworkArduino/esp32-hal-ledc.c.o
+Compiling .pio/build/esp32-s3-devkitc-1/FrameworkArduino/esp32-hal-matrix.c.o
+Compiling .pio/build/esp32-s3-devkitc-1/FrameworkArduino/esp32-hal-misc.c.o
+Compiling .pio/build/esp32-s3-devkitc-1/FrameworkArduino/esp32-hal-psram.c.o
+Compiling .pio/build/esp32-s3-devkitc-1/FrameworkArduino/esp32-hal-rgb-led.c.o
+Compiling .pio/build/esp32-s3-devkitc-1/FrameworkArduino/esp32-hal-rmt.c.o
+Compiling .pio/build/esp32-s3-devkitc-1/FrameworkArduino/esp32-hal-sigmadelta.c.o
+Compiling .pio/build/esp32-s3-devkitc-1/FrameworkArduino/esp32-hal-spi.c.o
+Compiling .pio/build/esp32-s3-devkitc-1/FrameworkArduino/esp32-hal-time.c.o
+Compiling .pio/build/esp32-s3-devkitc-1/FrameworkArduino/esp32-hal-timer.c.o
+Compiling .pio/build/esp32-s3-devkitc-1/FrameworkArduino/esp32-hal-tinyusb.c.o
+Compiling .pio/build/esp32-s3-devkitc-1/FrameworkArduino/esp32-hal-touch.c.o
+Compiling .pio/build/esp32-s3-devkitc-1/FrameworkArduino/esp32-hal-uart.c.o
+Compiling .pio/build/esp32-s3-devkitc-1/FrameworkArduino/firmware_msc_fat.c.o
+Compiling .pio/build/esp32-s3-devkitc-1/FrameworkArduino/libb64/cdecode.c.o
+Compiling .pio/build/esp32-s3-devkitc-1/FrameworkArduino/libb64/cencode.c.o
+Compiling .pio/build/esp32-s3-devkitc-1/FrameworkArduino/main.cpp.o
+Compiling .pio/build/esp32-s3-devkitc-1/FrameworkArduino/stdlib_noniso.c.o
+Compiling .pio/build/esp32-s3-devkitc-1/FrameworkArduino/wiring_pulse.c.o
+Compiling .pio/build/esp32-s3-devkitc-1/FrameworkArduino/wiring_shift.c.o
+Archiving .pio/build/esp32-s3-devkitc-1/libFrameworkArduino.a
+Indexing .pio/build/esp32-s3-devkitc-1/libFrameworkArduino.a
+Linking .pio/build/esp32-s3-devkitc-1/firmware.elf
+Retrieving maximum program size .pio/build/esp32-s3-devkitc-1/firmware.elf
+Checking size .pio/build/esp32-s3-devkitc-1/firmware.elf
+Advanced Memory Usage is available via "PlatformIO Home > Project Inspect"
+RAM:   [==        ]  18.4% (used 60160 bytes from 327680 bytes)
+Flash: [====      ]  44.0% (used 1383389 bytes from 3145728 bytes)
+Building .pio/build/esp32-s3-devkitc-1/firmware.bin
+esptool.py v4.11.0
+Creating esp32s3 image...
+Merged 2 ELF sections
+Successfully created esp32s3 image.
+========================= [SUCCESS] Took 24.80 seconds =========================
+
+Environment         Status    Duration
+------------------  --------  ------------
+esp32-s3-devkitc-1  SUCCESS   00:00:24.802
+========================= 1 succeeded in 00:00:24.802 =========================
